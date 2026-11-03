@@ -455,6 +455,14 @@ function headGeometry(L, zombie) {
   return g;
 }
 
+// Small rigid parts would otherwise squeeze a whole texture tile into a few
+// centimetres, which makes the bump mapping far too strong.
+function scaleUV(geo, k) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * k, uv.getY(i) * k);
+  return geo;
+}
+
 function placed(geo, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
   const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
   return geo.applyMatrix4(m);
@@ -486,7 +494,7 @@ function handGeometry(L, s) {
   }
   // thumb
   parts.push(placed(new THREE.CapsuleGeometry(0.009 * k, 0.03 * k, 3, 6), -s * 0.032 * k, w - 0.05 * k, -0.012, 0.5, 0, s * 0.5));
-  return mergeGeometries(parts.map((p) => p.toNonIndexed()));
+  return scaleUV(mergeGeometries(parts.map((p) => p.toNonIndexed())), 0.25);
 }
 
 // Shoe (or bare foot) in knee-bone space (ankle at y = -ankleDrop).
@@ -494,10 +502,10 @@ function footGeometry(L, bare) {
   const k = Math.pow(L.limb, 0.7);
   const a = -L.ankleDrop;
   if (bare) {
-    return mergeGeometries([
+    return scaleUV(mergeGeometries([
       placed(new THREE.CapsuleGeometry(0.034 * k, 0.15, 4, 10), 0, a - 0.05, 0.05, Math.PI / 2, 0, 0, 1, 0.75, 1).toNonIndexed(),
       placed(new THREE.SphereGeometry(0.036 * k, 10, 8), 0, a - 0.035, -0.01).toNonIndexed(),
-    ]);
+    ]), 0.35);
   }
   return mergeGeometries([
     placed(new THREE.CapsuleGeometry(0.042 * k, 0.16, 4, 10), 0, a - 0.048, 0.05, Math.PI / 2, 0, 0, 1.05, 0.72, 1).toNonIndexed(),
@@ -632,7 +640,7 @@ export function buildRig(outfit, owner, buildName = 'normal') {
     arms[side].hand = hand;
     const foot = visual(new THREE.Mesh(cachedGeo(`foot|${buildName}|${!!outfit.barefoot}`, () => footGeometry(L, outfit.barefoot)), outfit.barefoot ? mats.skin : mats.shoes), outfit.barefoot ? mats.skin : mats.shoes);
     legs[side].knee.add(foot);
-    const ear = visual(new THREE.Mesh(cachedGeo('ear', () => new THREE.SphereGeometry(0.028, 10, 8)), mats.skin), mats.skin);
+    const ear = visual(new THREE.Mesh(cachedGeo('ear', () => scaleUV(new THREE.SphereGeometry(0.028, 10, 8), 0.2)), mats.skin), mats.skin);
     ear.scale.set(0.32 * L.P.head, 1 * L.P.head, 0.62 * L.P.head);
     ear.position.set(s * (L.S.w * 0.93), hc.y + 0.004, hc.z - 0.012);
     ear.rotation.y = s * 0.35;
