@@ -216,7 +216,7 @@ export class HUD {
       let p = null;
       let warn = e.warn || 0;
       if (e.kind === 'zombie' && warn > 0.35 && !e.chase) {
-        e.rig.head.getWorldPosition(_v);
+        e.rig.headTarget.getWorldPosition(_v);
         p = _v;
         p.y += 0.35 * e.scale;
       } else if (e.kind === 'boss' && warn > 0.35) {

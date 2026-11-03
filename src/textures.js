@@ -99,6 +99,70 @@ function bloodSmears(cv, n, alpha = 0.6) {
   }
 }
 
+// Torn holes in clothing with raw flesh showing through.
+function rips(cv, n) {
+  const { g } = cv;
+  for (let i = 0; i < n; i++) {
+    const x = rand(6, cv.w - 6);
+    const y = rand(6, cv.h - 6);
+    const r = rand(3, 7);
+    g.beginPath();
+    for (let k = 0; k <= 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const rr = r * rand(0.5, 1.2);
+      const px = x + Math.cos(a) * rr * 1.3;
+      const py = y + Math.sin(a) * rr * 0.8;
+      k ? g.lineTo(px, py) : g.moveTo(px, py);
+    }
+    g.closePath();
+    g.fillStyle = '#5c1d1a';
+    g.fill();
+    g.lineWidth = 1.2;
+    g.strokeStyle = 'rgba(20,10,5,0.9)';
+    g.stroke();
+    g.fillStyle = 'rgba(150,60,50,0.6)';
+    g.fillRect(x - r * 0.4, y - 1, r * 0.8, 1.2);
+    for (let k = 0; k < 4; k++) g.fillRect(x + rand(-r, r), y + r * 0.6, 1, rand(3, 9)); // dangling threads / drips
+  }
+}
+
+// Maps a head-space direction to the sphere UV layout used in rig.js.
+function headUV(W, H) {
+  return (x, y, z) => {
+    const l = Math.hypot(x, y, z);
+    return [(0.5 + Math.atan2(x / l, z / l) / (Math.PI * 2)) * W, (Math.acos(y / l) / Math.PI) * H];
+  };
+}
+
+function paintHair(g, P, W, H, color, patchy) {
+  g.fillStyle = color;
+  // crown and back of the head; hairline is higher at the forehead
+  for (let x = 0; x <= W; x += 1) {
+    const u = x / W - 0.5; // -0.5..0.5, 0 = face
+    const front = Math.cos(u * Math.PI * 2); // 1 at the face, -1 at the back
+    const line = front > 0 ? lerpN(H * 0.36, H * 0.47, 1 - front) : lerpN(H * 0.47, H * 0.62, -front);
+    if (patchy && Math.random() < 0.25) continue;
+    const jag = patchy ? Math.random() * 6 : Math.random() * 2;
+    g.fillRect(x, 0, 1.2, line + jag);
+  }
+  g.fillStyle = 'rgba(0,0,0,0.25)';
+  for (let i = 0; i < 300; i++) g.fillRect(Math.random() * W, Math.random() * H * 0.5, 0.6, 2.5);
+  g.fillStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 0; i < 150; i++) g.fillRect(Math.random() * W, Math.random() * H * 0.45, 0.5, 2);
+  if (patchy) {
+    // bald patches with scalp showing
+    for (let i = 0; i < 3; i++) {
+      const [x, y] = P(Math.random() * 2 - 1, 0.75, Math.random() * 2 - 1);
+      const grd = g.createRadialGradient(x, y, 0, x, y, 7);
+      grd.addColorStop(0, 'rgba(130,125,105,0.9)');
+      grd.addColorStop(1, 'rgba(130,125,105,0)');
+      g.fillStyle = grd;
+      g.fillRect(x - 7, y - 7, 14, 14);
+    }
+  }
+}
+const lerpN = (a, b, t) => a + (b - a) * t;
+
 const cache = {};
 function cached(key, fn) {
   if (!cache[key]) cache[key] = fn();
@@ -551,20 +615,47 @@ export const T = {
     cached('skin' + variant, () => {
       const cv = mk(64);
       const g = cv.g;
-      const bases = ['#7d8a6e', '#8f8b7a', '#6b7562', '#9a8f80', '#77806e'];
+      const bases = ['#7b876f', '#8d897b', '#6a7564', '#978c7f', '#74806c'];
       g.fillStyle = bases[variant % bases.length];
       g.fillRect(0, 0, 64, 64);
-      speckle(cv, 500, ['rgba(40,50,30,0.4)', 'rgba(120,40,40,0.3)', 'rgba(255,255,255,0.08)'], 1, 2);
-      blobs(cv, 5, 'rgba(60,30,40,A)', 4, 10, 0.5);
-      g.strokeStyle = 'rgba(50,40,70,0.5)';
-      for (let i = 0; i < 4; i++) {
-        g.beginPath();
+      // mottled, uneven dead skin
+      blobs(cv, 16, 'rgba(95,120,80,A)', 5, 14, 0.3);
+      blobs(cv, 12, 'rgba(120,70,95,A)', 4, 11, 0.32);
+      blobs(cv, 10, 'rgba(150,140,110,A)', 4, 10, 0.25);
+      blobs(cv, 8, 'rgba(50,40,30,A)', 3, 8, 0.35);
+      // veins showing through
+      g.lineWidth = 0.6;
+      for (let i = 0; i < 7; i++) {
+        g.strokeStyle = `rgba(${randi(50, 80)},${randi(40, 60)},${randi(80, 110)},0.55)`;
         let x = rand(0, 64);
         let y = rand(0, 64);
+        let a = rand(0, Math.PI * 2);
+        g.beginPath();
         g.moveTo(x, y);
-        for (let s = 0; s < 5; s++) g.lineTo((x += rand(-6, 6)), (y += rand(2, 8)));
+        for (let k = 0; k < 9; k++) {
+          a += rand(-0.7, 0.7);
+          x += Math.cos(a) * 2.5;
+          y += Math.sin(a) * 2.5;
+          g.lineTo(x, y);
+          if (Math.random() < 0.2) {
+            g.moveTo(x, y);
+          }
+        }
         g.stroke();
       }
+      // open sores
+      for (let i = 0; i < 3; i++) {
+        const x = rand(4, 60);
+        const y = rand(4, 60);
+        const r = rand(1.2, 2.8);
+        const grd = g.createRadialGradient(x, y, 0, x, y, r * 1.8);
+        grd.addColorStop(0, 'rgba(60,5,5,0.95)');
+        grd.addColorStop(0.5, 'rgba(120,30,30,0.8)');
+        grd.addColorStop(1, 'rgba(140,90,70,0)');
+        g.fillStyle = grd;
+        g.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
+      }
+      speckle(cv, 700, ['rgba(40,50,30,0.35)', 'rgba(120,40,40,0.25)', 'rgba(255,255,255,0.07)'], 1, 1);
       bloodSmears(cv, 1, 0.5);
       return toTex(cv.c);
     }),
@@ -581,85 +672,128 @@ export const T = {
 
   // Wrap-around head textures for sphere heads: the face is centred at u=0.25
   // (the +z side of a THREE.SphereGeometry), hair covers the top and back.
+  // Head textures for the sculpted sphere heads in rig.js. Canvas x maps to
+  // longitude (face at the centre), canvas y to latitude (crown at the top).
   zombieHead: (variant = 0, hair = null) =>
-    cached('zhead' + variant + hair, () => {
-      const cv = mk(128, 64);
+    cached('zhead2' + variant + hair, () => {
+      const W = 160;
+      const H = 128;
+      const cv = mk(W, H);
       const g = cv.g;
-      g.drawImage(T.skin(variant).image, 0, 0, 64, 64);
-      g.drawImage(T.skin(variant).image, 64, 0, 64, 64);
-      const fx = 32;
-      // sunken eye sockets
-      for (const s of [-1, 1]) {
-        const grd = g.createRadialGradient(fx + s * 8, 27, 0, fx + s * 8, 27, 8);
-        grd.addColorStop(0, 'rgba(10,0,0,0.95)');
-        grd.addColorStop(0.6, 'rgba(30,10,15,0.7)');
-        grd.addColorStop(1, 'rgba(40,20,30,0)');
+      const P = headUV(W, H);
+      for (let x = 0; x < W; x += 64) for (let y = 0; y < H; y += 64) g.drawImage(T.skin(variant).image, x, y, 64, 64);
+      const shade = (x, y, r, rgb, a, sy = 1) => {
+        g.save();
+        g.translate(x, y);
+        g.scale(1, sy);
+        const grd = g.createRadialGradient(0, 0, 0, 0, 0, r);
+        grd.addColorStop(0, `rgba(${rgb},${a})`);
+        grd.addColorStop(1, `rgba(${rgb},0)`);
         g.fillStyle = grd;
-        g.fillRect(fx + s * 8 - 8, 19, 16, 16);
+        g.fillRect(-r, -r, r * 2, r * 2);
+        g.restore();
+      };
+      // sunken temples and cheeks
+      for (const sx of [-1, 1]) {
+        const [tx, ty] = P(sx * 0.72, 0.25, 0.6);
+        shade(tx, ty, 9, '40,30,40', 0.35);
+        const [cx, cy] = P(sx * 0.45, -0.3, 0.84);
+        shade(cx, cy, 8, '40,20,30', 0.4);
       }
-      // nose cavity
-      g.fillStyle = 'rgba(25,5,5,0.85)';
-      g.fillRect(fx - 3, 33, 2, 4);
-      g.fillRect(fx + 1, 33, 2, 4);
-      // torn mouth with teeth
-      const mw = variant % 2 ? 16 : 12;
-      g.fillStyle = '#160404';
+      // dark, bruised eye sockets with a dull eye in each
+      for (const sx of [-1, 1]) {
+        const [ex, ey] = P(sx * 0.34, 0.14, 0.93);
+        shade(ex, ey + 0.6, 8.5, '45,10,25', 0.9, 0.8);
+        shade(ex, ey, 4.2, '10,0,0', 0.95, 0.75);
+        g.fillStyle = 'rgba(200,190,150,0.55)';
+        g.beginPath();
+        g.ellipse(ex, ey, 2.1, 1.3, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // nostrils
+      const [nx, ny] = P(0, -0.2, 0.98);
+      g.fillStyle = 'rgba(25,5,5,0.9)';
+      for (const sx of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(nx + sx * 2.2, ny, 1.3, 0.9, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      // torn mouth: cracked lips, gums and teeth
+      const [mx, my] = P(0, -0.43, 0.9);
+      const mw = variant % 2 ? 8.5 : 7;
+      g.fillStyle = 'rgba(85,35,40,0.9)';
       g.beginPath();
-      g.ellipse(fx, 44, mw / 2, 4.5, 0, 0, Math.PI * 2);
+      g.ellipse(mx, my + 0.8, mw + 1.2, 3.6, 0, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = '#cfc6a0';
-      for (let x = fx - mw / 2 + 1.5; x < fx + mw / 2 - 1; x += 2.2) {
-        g.fillRect(x, 40.5, 1.6, rand(1.5, 2.6));
-        g.fillRect(x + 0.6, 47.5 - rand(1, 2.5), 1.6, 2);
+      g.fillStyle = '#140303';
+      g.beginPath();
+      g.ellipse(mx, my + 0.9, mw, 2.1, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#d2c79e';
+      for (let x = mx - mw + 1; x < mx + mw - 1; x += 1.6) {
+        if (Math.random() < 0.15) continue; // missing teeth
+        g.fillRect(x, my - 0.9, 1.2, rand(1.1, 1.9));
+        g.fillRect(x + 0.4, my + 2.4 - rand(0.8, 1.6), 1.2, 1.5);
       }
-      g.fillStyle = 'rgba(120,0,0,0.85)';
-      for (let i = 0; i < 5; i++) g.fillRect(fx - mw / 2 + rand(0, mw), 46, 1.2, rand(3, 12));
-      // bruising and wounds
-      blobs(cv, 4, 'rgba(70,20,40,A)', 3, 7, 0.6);
-      if (hair) {
-        g.fillStyle = hair;
-        g.fillRect(0, 0, 128, 11);
-        for (let x = 0; x < 128; x += 2) {
-          const back = x > 52 && x < 140;
-          g.fillRect(x, 10, 2, back ? rand(16, 30) : rand(0, 5));
-        }
-        speckle(cv, 300, ['rgba(0,0,0,0.3)'], 1, 1);
+      g.fillStyle = 'rgba(110,0,0,0.85)';
+      for (let i = 0; i < 6; i++) g.fillRect(mx - mw + rand(0, mw * 2), my + 2.5, rand(0.8, 1.6), rand(4, 18));
+      // bite wounds / gashes
+      for (let i = 0; i < 2; i++) {
+        const [wx, wy] = P(rand(-0.8, 0.8), rand(-0.3, 0.5), rand(0.2, 1));
+        shade(wx, wy, rand(3, 5), '90,5,5', 0.9);
+        shade(wx, wy, 1.6, '30,0,0', 0.9);
       }
+      // ears
+      for (const ux of [0.25, 0.75]) shade(W * ux, P(0, 0.0, 1)[1], 7, '50,30,35', 0.4);
+      if (hair) paintHair(g, P, W, H, hair, true);
+      speckle(cv, 250, ['rgba(0,0,0,0.25)'], 1, 1);
       return toTex(cv.c);
     }),
 
   humanHead: (variant = 0, hair = '#2a1d14') =>
-    cached('hhead' + variant + hair, () => {
-      const cv = mk(128, 64);
+    cached('hhead2' + variant + hair, () => {
+      const W = 160;
+      const H = 128;
+      const cv = mk(W, H);
       const g = cv.g;
-      g.drawImage(T.humanSkin(variant).image, 0, 0, 64, 64);
-      g.drawImage(T.humanSkin(variant).image, 64, 0, 64, 64);
-      const fx = 32;
-      for (const s of [-1, 1]) {
-        g.fillStyle = '#f2efe6';
+      const P = headUV(W, H);
+      for (let x = 0; x < W; x += 32) for (let y = 0; y < H; y += 32) g.drawImage(T.humanSkin(variant).image, x, y, 32, 32);
+      for (const sx of [-1, 1]) {
+        const [ex, ey] = P(sx * 0.34, 0.14, 0.93);
+        g.fillStyle = 'rgba(0,0,0,0.18)';
         g.beginPath();
-        g.ellipse(fx + s * 7, 28, 3.2, 2, 0, 0, Math.PI * 2);
+        g.ellipse(ex, ey - 0.8, 4, 2.6, 0, 0, Math.PI * 2);
         g.fill();
-        g.fillStyle = '#2b1a10';
+        g.fillStyle = '#f2eee4';
         g.beginPath();
-        g.arc(fx + s * 7, 28, 1.5, 0, Math.PI * 2);
+        g.ellipse(ex, ey, 2.6, 1.4, 0, 0, Math.PI * 2);
         g.fill();
+        g.fillStyle = '#3a2614';
+        g.beginPath();
+        g.arc(ex + sx * 0.2, ey, 1.1, 0, Math.PI * 2);
+        g.fill();
+        const [bx, by] = P(sx * 0.34, 0.3, 0.9);
         g.fillStyle = hair;
-        g.fillRect(fx + s * 7 - 4, 23.5, 8, 1.6);
+        g.fillRect(bx - 3.5, by - 0.6, 7, 1.3);
       }
-      g.fillStyle = 'rgba(0,0,0,0.18)';
-      g.fillRect(fx - 1, 30, 2, 6);
-      g.fillStyle = '#5a1c18';
+      const [nx, ny] = P(0, -0.2, 0.98);
+      g.fillStyle = 'rgba(60,20,10,0.5)';
+      for (const sx of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(nx + sx * 2, ny, 1.1, 0.7, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      const [mx, my] = P(0, -0.43, 0.9);
+      g.fillStyle = '#9a4a42';
       g.beginPath();
-      g.ellipse(fx, 42, 4, 2.6, 0, 0, Math.PI * 2);
+      g.ellipse(mx, my + 0.8, 5.5, 2.2, 0, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = hair;
-      g.fillRect(0, 0, 128, 13);
-      for (let x = 0; x < 128; x += 2) {
-        const back = x > 52;
-        g.fillRect(x, 12, 2, back ? rand(22, 34) : rand(0, 7));
-      }
-      speckle(cv, 300, ['rgba(0,0,0,0.25)', 'rgba(255,255,255,0.06)'], 1, 1);
+      g.fillStyle = '#3a1210';
+      g.beginPath();
+      g.ellipse(mx, my + 0.8, 4.2, 1.1, 0, 0, Math.PI * 2); // frightened, open mouth
+      g.fill();
+      paintHair(g, P, W, H, hair, false);
+      speckle(cv, 200, ['rgba(0,0,0,0.06)'], 1, 1);
       return toTex(cv.c);
     }),
 
@@ -719,7 +853,11 @@ export const T = {
       }
       speckle(cv, 400, ['rgba(0,0,0,0.2)', 'rgba(255,255,255,0.05)'], 1, 2);
       blobs(cv, 5, 'rgba(30,25,15,A)', 5, 14, 0.4);
-      if (bloody > 0) bloodSmears(cv, Math.round(bloody * 3), 0.75);
+      if (bloody > 0) {
+        rips(cv, Math.round(bloody * 3));
+        bloodSmears(cv, Math.round(bloody * 3), 0.75);
+        blobs(cv, Math.round(bloody * 4), 'rgba(70,0,0,A)', 6, 14, 0.45);
+      }
       return toTex(cv.c);
     }),
 

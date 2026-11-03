@@ -18,7 +18,7 @@ import { Director } from './director.js';
 import { HUD } from './hud.js';
 import { Input } from './input.js';
 import { STAGES } from './stages.js';
-import { rand, clamp, damp, pad } from './util.js';
+import { rand, clamp, damp, pad, pick } from './util.js';
 
 const DIFFS = {
   easy: { name: 'EASY', lives: 7, hp: 0.8, speed: 0.85, windup: 1.35, timeMul: 1.4, bossHp: 0.75, bossDmg: 1 },
@@ -1023,8 +1023,10 @@ export class Game {
         p = e.aimPoint();
         s = 400;
       } else if (e.kind === 'zombie' && e.root.position.y > -1) {
-        p = e.rig.head.getWorldPosition(new THREE.Vector3());
-        if (!e.rig.head.visible) p = e.root.position.clone().setY(1);
+        // mostly headshots, but sometimes aim for a limb so dismemberment gets exercised
+        if (!e.botPart) e.botPart = Math.random() < 0.6 ? e.rig.headTarget : pick(e.rig.hitboxes);
+        if (e.headless || !e.botPart.layers.isEnabled(1) && e.botPart !== e.rig.headTarget) e.botPart = e.rig.hitboxes[1];
+        p = e.botPart.getWorldPosition(new THREE.Vector3());
         s = 300 - p.distanceTo(cam) * 5 + (e.warn || 0) * 400 + (e.chase ? 200 : 0);
       } else if (e.kind === 'pickup') {
         p = e.root.position.clone();
