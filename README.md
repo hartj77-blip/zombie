@@ -1,6 +1,6 @@
 # GRAVE SHIFT
 
-![Zombies shambling down a rain-soaked street at night](./docs/screenshot.jpg)
+![Zombies, one missing an arm, shambling down a rain-soaked street at night](./docs/screenshot.jpg)
 
 A browser zombie **rail shooter** in the spirit of the classic arcade light-gun games: the camera moves you through the level on rails while you aim and shoot with the mouse. It combines three influences:
 
@@ -29,7 +29,8 @@ To play it online, enable **GitHub Pages** for this repo (Settings → Pages →
 
 ## How to play
 
-- **Headshots** kill instantly. Body shots knock zombies back; arm and leg shots can **sever limbs** (a zombie that loses a leg will crawl).
+- **Headshots** kill instantly (and take the head off). Body shots knock zombies back.
+- **Shoot limbs off**: one pistol round to the forearm cuts it off at the elbow, two to the upper arm take the whole arm at the shoulder, and the same goes for shins (knee) and thighs (hip). A zombie that loses a leg drops and crawls after you. Shotgun blasts at close range can tear a zombie apart entirely.
 - A zombie that **flashes red** with a **"!"** marker over it is about to hit you. Shoot it to interrupt the attack, or take cover.
 - **Thrown objects** (bottles, cleavers, acid) can be shot out of the air.
 - **Survivors**: kill the zombies chasing them to earn an extra life. Don't shoot the survivors.
@@ -71,7 +72,7 @@ npm run build
 | `src/stages.js` | Level geometry and beat scripts for the three chapters |
 | `src/entities.js` | Zombies (6 types) and their AI, survivors, projectiles, pickups, barrels, crates |
 | `src/bosses.js` | The three bosses |
-| `src/rig.js` | Procedurally animated humanoid models and outfits |
+| `src/rig.js` | Procedurally generated skinned humanoids (lofted bodies, sculpted heads, hitboxes), outfits and severed-limb pieces |
 | `src/weapons.js` | Hitscan weapons, reloading, cover reload |
 | `src/builder.js` | Level construction kit: materials, batching, props |
 | `src/effects.js` | Particles, blood decals, debris, fire, rain, pooled dynamic lights |
