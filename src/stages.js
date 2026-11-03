@@ -409,7 +409,8 @@ const stage2 = {
     ])
       b.cyl(M.white, 0.3, 0.3, 4, x, 2, z, 12);
     b.box(M.lampCold, 10, 0.1, 6, 44, 9.9, -76);
-    b.light(44, 8, -76, 0xbfd8ff, 30, 25);
+    b.light(44, 8, -76, 0xbfd8ff, 70, 30);
+    b.light(44, 3.5, -70, 0xd8e8ff, 14, 12, { flicker: 0.3 });
     b.cone(44, 9.85, -76, 6, 9.85, 0x9ab8ff, 0.03);
     b.ceilingLight(36, -80, 3.95, true, 0.6);
     b.ceilingLight(50, -72, 3.95, true);
@@ -585,7 +586,8 @@ const stage3 = {
     b.cyl(M.black, 5.5, 5.5, 0.05, -48, 0.01, -82, 32);
     b.cyl(M.hazard, 6.2, 6.2, 0.2, -48, -0.02, -82, 32);
     b.cyl(M.black, 5.5, 5.5, 0.4, -48, 0.06, -82, 32);
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+    // support pillars only on the far side of the pit so they never block the boss
+    for (let a = Math.PI / 2; a <= Math.PI * 1.5 + 0.01; a += Math.PI / 4) {
       b.cyl(M.darkMetal, 0.25, 0.3, 12, -48 + Math.cos(a) * 9, 6, -82 + Math.sin(a) * 9, 10);
     }
     b.box(M.glass, 0.1, 2.2, 10, -63.8, 5, -82);
@@ -672,7 +674,7 @@ const stage3 = {
         ],
       },
     },
-    { move: [[-26, E, -82], [-32, E, -82]], speed: 2.5, msg: 'CONTAINMENT BREACH', color: '#ff4a3a' },
+    { move: [[-26, E, -82], [-35, E, -82]], speed: 2.5, msg: 'CONTAINMENT BREACH', color: '#ff4a3a' },
     { look: [-46, 3, -82], wait: 1.0 },
     { boss: 'zero', at: [-48, 0, -82], look: [-47, 3.2, -82] },
     { wait: 2, msg: 'SUBJECT ZERO ELIMINATED', dur: 2.5 },
