@@ -1,6 +1,8 @@
 # GRAVE SHIFT
 
-![Zombies, one missing an arm, shambling down a rain-soaked street at night](./docs/screenshot.jpg)
+### [▶ Play GRAVE SHIFT in your browser](https://hartj77-blip.github.io/zombie/)
+
+[![Zombies, one missing an arm, shambling down a rain-soaked street at night](./docs/screenshot.jpg)](https://hartj77-blip.github.io/zombie/)
 
 A browser zombie **rail shooter** in the spirit of the classic arcade light-gun games: the camera moves you through the level on rails while you aim and shoot with the mouse. It combines three influences:
 
@@ -12,9 +14,11 @@ The look aims for the PS2/PS3 era: smooth characters, real-time flashlight shado
 
 ## Play
 
-Open `index.html` in a modern desktop browser (Chrome, Edge, Firefox or Safari). No server or install needed; the game is pre-built into `dist/game.js`.
+**Online:** https://hartj77-blip.github.io/zombie/ (best in a desktop browser: Chrome, Edge, Firefox or Safari).
 
-To play it online, enable **GitHub Pages** for this repo (Settings → Pages → Deploy from a branch → pick the branch and `/ (root)`), then open the Pages URL.
+**Offline:** download or clone this repo and open `index.html`. No server or install needed; the game is pre-built into `dist/game.js`.
+
+The online link is served by **GitHub Pages**. If it shows a 404, Pages hasn't been switched on yet: in the repo go to Settings → Pages, choose **Deploy from a branch**, pick `main` and `/ (root)`, and save. The site is live a minute or two later.
 
 ## Controls
 
