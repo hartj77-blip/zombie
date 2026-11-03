@@ -25,11 +25,13 @@ export class Director {
     this.fight = null;
     this.beat = null;
     this.done = false;
-    // fast-forward the camera if starting mid-stage (debug)
+    // fast-forward the camera if starting mid-stage (debug); props still spawn
+    this.skippedSpawns = [];
     for (let k = 0; k < startBeat; k++) {
       const b = this.beats[k];
       if (b.move) this.pos.copy(v3(b.move[b.move.length - 1]));
       if (b.look) this.look.copy(v3(b.look));
+      if (b.spawn) this.skippedSpawns.push(...b.spawn.filter((s) => !s.type || !['shambler', 'runner', 'brute', 'thrower', 'crawler', 'leaper'].includes(s.type)));
     }
     this.lookTarget.copy(this.look);
   }
@@ -46,6 +48,10 @@ export class Director {
       return;
     }
     const g = this.game;
+    if (this.skippedSpawns && this.skippedSpawns.length) {
+      this.skippedSpawns.forEach((s) => g.spawn(s, null));
+      this.skippedSpawns = null;
+    }
     if (b.move) {
       const pts = [this.pos.clone(), ...b.move.map(v3)];
       this.curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);

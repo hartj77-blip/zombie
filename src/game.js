@@ -144,6 +144,18 @@ export class Game {
     window.addEventListener('resize', () => this.resize());
     this.resize();
     window.GAME = this;
+    // debug helper: render one frame and return it as a PNG data URL
+    window.SNAPSHOT = () => {
+      this.composer.render(0.016);
+      this.hud.draw(0.016);
+      const c = document.createElement('canvas');
+      c.width = this.renderer.domElement.width;
+      c.height = this.renderer.domElement.height;
+      const x = c.getContext('2d');
+      x.drawImage(this.renderer.domElement, 0, 0);
+      x.drawImage(this.hud.c, 0, 0, c.width, c.height);
+      return c.toDataURL('image/png');
+    };
 
     this.last = performance.now();
     this.toTitle();
@@ -186,7 +198,7 @@ export class Game {
     scene.add(this.moon);
 
     // the player's flashlight follows the crosshair
-    const fl = (this.flashlight = new THREE.SpotLight(0xfff0d8, 90, 42, 0.44, 0.55, 1.6));
+    const fl = (this.flashlight = new THREE.SpotLight(0xfff0d8, 22, 45, 0.44, 0.55, 1.5));
     fl.castShadow = high;
     fl.shadow.mapSize.set(1024, 1024);
     fl.shadow.camera.near = 0.3;
@@ -863,6 +875,7 @@ export class Game {
 
   loop(now) {
     requestAnimationFrame((t) => this.loop(t));
+    if (this.frozen) return; // debug: stop updating/rendering (used by screenshot tooling)
     const rawDt = (now - this.last) / 1000;
     let dt = Math.min(this.debug.dtmax, rawDt);
     this.last = now;
