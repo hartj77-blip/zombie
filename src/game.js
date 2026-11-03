@@ -817,6 +817,14 @@ export class Game {
     return clamp(_v2.x, -1, 1) * 0.8;
   }
 
+  // Is a ground position inside the (slightly narrowed) horizontal view?
+  inView(pos) {
+    const dx = pos.x - this.playerPos.x;
+    const dz = pos.z - this.playerPos.z;
+    const d = Math.hypot(dx, dz) || 0.001;
+    return (dx * this.camFwd.x + dz * this.camFwd.z) / d > (this.viewCos ?? 0.75);
+  }
+
   isBehind(pos, margin = 0) {
     const c = this.camera.position;
     return (pos.x - c.x) * this.camFwd.x + (pos.z - c.z) * this.camFwd.z < -margin;
@@ -849,6 +857,10 @@ export class Game {
     cam.lookAt(_v2);
     cam.rotateZ(sway * 0.4 + this.coverAmt * 0.05);
     this.playerPos.set(d.pos.x, 0, d.pos.z);
+    // horizontal half field of view, used to keep attackers on screen
+    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect);
+    this.viewCos = Math.cos(hf * 0.82);
+    this.viewTan = Math.tan(hf * 0.7);
 
     // flashlight from the right shoulder towards the crosshair
     _v.set(0.28, -0.22, 0.05);
