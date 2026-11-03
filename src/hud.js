@@ -145,6 +145,7 @@ export class HUD {
     this.drawSplats(dt);
     this.drawVignettes(dt);
     this.drawThreats();
+    this.drawOffscreen();
     this.drawPopups(dt);
     this.drawCondition(dt);
     this.drawScore();
@@ -262,6 +263,61 @@ export class HUD {
       ctx.fillText('!', 0, size * 0.12);
       ctx.restore();
     }
+  }
+
+  // Pulsing arrows on the screen edges for zombies that are close but out of view.
+  drawOffscreen() {
+    const g = this.g;
+    const ctx = this.ctx;
+    const u = this.ui;
+    const pp = g.playerPos;
+    const f = g.camFwd;
+    let left = 0;
+    let right = 0;
+    for (const e of g.entities) {
+      if (e.kind !== 'zombie' || e.dead || e.chase) continue;
+      const p = e.root.position;
+      const dx = p.x - pp.x;
+      const dz = p.z - pp.z;
+      if (Math.hypot(dx, dz) > 9) continue;
+      const s = this.toScreen(_v.copy(p).setY(p.y + 1.2 * e.scale));
+      if (!s.behind && s.x > 0 && s.x < this.w) continue;
+      if (dx * -f.z + dz * f.x >= 0) right++;
+      else left++;
+    }
+    const pulse = 0.55 + 0.45 * Math.sin(this.time * 10);
+    const arrow = (x, dir, n) => {
+      const y = this.h * 0.5;
+      const sz = 26 * u;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(dir, 1);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ff2a1a';
+      ctx.shadowColor = '#ff2a1a';
+      ctx.shadowBlur = 14;
+      for (let k = 0; k < 2; k++) {
+        ctx.beginPath();
+        ctx.moveTo(sz * (0.2 + k * 0.6), -sz);
+        ctx.lineTo(sz * (0.9 + k * 0.6), 0);
+        ctx.lineTo(sz * (0.2 + k * 0.6), sz);
+        ctx.lineTo(sz * (0.45 + k * 0.6), 0);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      if (n > 1) {
+        ctx.globalAlpha = 1;
+        ctx.font = `bold ${Math.round(14 * u)}px ${F}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffd0c0';
+        ctx.fillText(`×${n}`, x - dir * 4 * u, y + sz + 16 * u);
+      }
+      ctx.globalAlpha = 1;
+    };
+    // chevrons extend 1.5 sizes outward from the anchor; keep the tips on screen
+    if (left) arrow(48 * u, -1, left);
+    if (right) arrow(this.w - 48 * u, 1, right);
   }
 
   drawPopups(dt) {

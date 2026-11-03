@@ -120,7 +120,7 @@ export class Zombie extends Entity {
       this.vy = 0;
     } else if (em === 'getup') {
       this.state = 'getup';
-      this.emergeT = -rand(0.2, 0.8);
+      this.emergeT = -(o.lie ?? rand(0.2, 0.8));
       this.rig.hips.rotation.x = -1.45;
       this.rig.hips.position.y = 0.22;
     } else if (em === 'idle') {
@@ -210,6 +210,9 @@ export class Zombie extends Entity {
         faceYaw = Math.atan2(tdx, tdz);
         break;
       case 'walk': {
+        // Zombies coming for the player must be on screen before they can
+        // attack, throw or leap; off screen they circle round into view.
+        const onScreen = this.chase ? true : g.inView(pos);
         let goal = tgt;
         if (this.path.length) {
           goal = this.path[0];
@@ -217,19 +220,21 @@ export class Zombie extends Entity {
             this.path.shift();
             goal = this.path.length ? this.path[0] : tgt;
           }
+        } else if (!onScreen) {
+          goal = this.approachPoint(this.def.throws ? this.keep : this.range * 0.92);
         }
         const gx = goal.x - pos.x;
         const gz = goal.z - pos.z;
         const gd = Math.hypot(gx, gz) || 0.001;
-        if (!this.path.length && tdist <= this.range) {
+        if (!this.path.length && onScreen && tdist <= this.range) {
           this.startAttack();
-        } else if (this.def.throws && !this.path.length && tdist <= this.keep) {
+        } else if (this.def.throws && !this.path.length && onScreen && tdist <= this.keep) {
           faceYaw = Math.atan2(tdx, tdz);
           if (this.cool <= 0 && !this.chase) {
             this.state = 'throw';
             this.atk = 0;
           }
-        } else if (this.def.leaps && !this.path.length && tdist < 7.5 && tdist > 2.6 && this.cool <= 0 && !this.chase) {
+        } else if (this.def.leaps && !this.path.length && onScreen && tdist < 7.5 && tdist > 2.6 && this.cool <= 0 && !this.chase) {
           this.state = 'crouch';
           this.atk = 0;
           g.audio.play('shriek', { pan: g.panFor(pos), pitch: rand(0.9, 1.2) });
@@ -239,9 +244,9 @@ export class Zombie extends Entity {
           const step = Math.min(sp * dt, gd);
           pos.x += (gx / gd) * step;
           pos.z += (gz / gd) * step;
-          faceYaw = Math.atan2(gx, gz);
-          moving = sp;
-          this.phase += sp * dt * (this.def.run ? 4.2 : this.crawling ? 7 : 5.5);
+          faceYaw = gd > 0.05 ? Math.atan2(gx, gz) : Math.atan2(tdx, tdz);
+          moving = gd > 0.05 ? sp : 0;
+          this.phase += moving * dt * (this.def.run ? 4.2 : this.crawling ? 7 : 5.5);
         }
         if (pos.y > 0 && this.state === 'walk') pos.y = damp(pos.y, 0, 5, dt);
         break;
@@ -343,6 +348,18 @@ export class Zombie extends Entity {
     }
 
     this.animate(dt, moving);
+  }
+
+  // A spot in front of the camera, on the side the zombie is already on.
+  approachPoint(dist) {
+    const g = this.game;
+    const f = g.camFwd;
+    const pp = g.playerPos;
+    const dx = this.root.position.x - pp.x;
+    const dz = this.root.position.z - pp.z;
+    const side = (dx * -f.z + dz * f.x) / Math.max(1, Math.hypot(dx, dz));
+    const lat = clamp(side * 1.5, -1, 1) * dist * g.viewTan * 0.6;
+    return _v2.set(pp.x + f.x * dist - f.z * lat, 0, pp.z + f.z * dist + f.x * lat);
   }
 
   groan(vol = 1) {

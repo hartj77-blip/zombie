@@ -202,9 +202,12 @@ const stage1 = {
           [
             { type: 'survivor', at: [-11, -21.5], path: [[-6, -21], [-2.4, -17.5]], exit: [[-4, -12], [-6.6, -6], [-6.6, 6]], chasers: [{ type: 'shambler', at: [-13.5, -22.5] }, { type: 'shambler', at: [-15, -21], speedMul: 1.3 }] },
             { type: 'shambler', at: [3, -30], delay: 1 },
+            // "dead" bodies in the road that get back up (shoot them before they do)
+            { type: 'shambler', at: [2.2, -20], emerge: 'getup', lie: 10 },
+            { type: 'shambler', at: [-2.5, -22], emerge: 'getup', lie: 13 },
           ],
           { left: 1, spawns: [{ type: 'shambler', at: [-2, -36] }, { type: 'shambler', at: [1.5, -39], delay: 0.6 }, { type: 'shambler', at: [4, -34], delay: 1.2 }, { type: 'runner', at: [0, -48], delay: 2.5 }] },
-          [{ type: 'shambler', at: [2.2, -20], emerge: 'rise' }, { type: 'shambler', at: [-2.5, -22], emerge: 'rise', riseDelay: 0.5 }, { type: 'crawler', at: [-4, -26], delay: 1 }],
+          [{ type: 'shambler', at: [3, -40] }, { type: 'runner', at: [-2, -45], delay: 0.8 }, { type: 'crawler', at: [-4, -26], delay: 1 }],
         ],
       },
     },
@@ -275,8 +278,14 @@ const stage1 = {
       fight: {
         time: 30,
         waves: [
-          [{ type: 'shambler', at: [40, -89] }, { type: 'shambler', at: [42, -91.5], delay: 0.6 }, { type: 'runner', at: [46, -90], delay: 1.4 }],
-          [{ type: 'runner', at: [44, -88] }, { type: 'shambler', at: [38, -92], emerge: 'rise' }, { type: 'shambler', at: [35, -88.5], emerge: 'rise', riseDelay: 0.6 }, { type: 'thrower', at: [46, -91], delay: 1 }],
+          [
+            { type: 'shambler', at: [40, -89] },
+            { type: 'shambler', at: [42, -91.5], delay: 0.6 },
+            { type: 'runner', at: [46, -90], delay: 1.4 },
+            { type: 'shambler', at: [35, -88.5], emerge: 'getup', lie: 7 },
+            { type: 'shambler', at: [38, -92], emerge: 'getup', lie: 9 },
+          ],
+          [{ type: 'runner', at: [44, -88] }, { type: 'shambler', at: [43, -90.5], delay: 0.6 }, { type: 'thrower', at: [46, -91], delay: 1 }],
         ],
       },
     },
