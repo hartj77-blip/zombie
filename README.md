@@ -1,6 +1,6 @@
 # GRAVE SHIFT
 
-![Zombies shambling down a rain-soaked street at night](./docs/screenshot.jpg)
+![Zombies, one missing an arm, shambling down a rain-soaked street at night](./docs/screenshot.jpg)
 
 A browser zombie **rail shooter** in the spirit of the classic arcade light-gun games: the camera moves you through the level on rails while you aim and shoot with the mouse. It combines three influences:
 
