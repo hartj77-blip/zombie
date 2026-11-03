@@ -1,5 +1,7 @@
 # GRAVE SHIFT
 
+![Zombies shambling down a rain-soaked street at night](./docs/screenshot.jpg)
+
 A browser zombie **rail shooter** in the spirit of the classic arcade light-gun games: the camera moves you through the level on rails while you aim and shoot with the mouse. It combines three influences:
 
 - **Rail shooting and dismemberment** (House of the Dead style): headshots, severed limbs, survivors to rescue, bosses with glowing weak points
@@ -12,7 +14,7 @@ The look aims for the PS2/PS3 era: smooth characters, real-time flashlight shado
 
 Open `index.html` in a modern desktop browser (Chrome, Edge, Firefox or Safari). No server or install needed; the game is pre-built into `dist/game.js`.
 
-To host it, enable **GitHub Pages** for this repo (Settings → Pages → Deploy from branch → `main` / root), then open the Pages URL.
+To play it online, enable **GitHub Pages** for this repo (Settings → Pages → Deploy from a branch → pick the branch and `/ (root)`), then open the Pages URL.
 
 ## Controls
 
