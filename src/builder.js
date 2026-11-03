@@ -302,7 +302,7 @@ export class Builder {
   }
 
   sign(text, x, y, z, ry, w = 3, h = 0.75, bg = '#1a1010', fg = '#ffcf6a', lightIt = true) {
-    const tex = T.sign(text, bg, fg);
+    const tex = T.sign(text, bg, fg, Math.round(Math.min(1024, Math.max(256, (128 * w) / h))), 128);
     const mat = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.9, roughness: 0.8 });
     const m = this.mesh(new THREE.PlaneGeometry(w, h), mat, x, y, z, ry);
     if (lightIt) {
@@ -375,9 +375,24 @@ export class Builder {
   bus(x, z, ry = 0) {
     const M = this.M;
     const body = this._colorMat(0x8a7020);
-    this.box(body, 2.6, 2.8, 11, x, 0.4, z, ry, 0, 0.05);
-    this.box(M.glass, 2.65, 0.9, 10, x, 2.0, z, ry, 0, 0.05);
-    this.box(M.black, 2.62, 0.4, 11.02, x, 0.4, z, ry, 0, 0.05);
+    const c = Math.cos(ry);
+    const s = Math.sin(ry);
+    this.box(body, 2.6, 2.6, 11, x, 0.5, z, ry);
+    this.box(M.glass, 2.66, 0.95, 10.2, x, 1.75, z, ry);
+    // window pillars
+    for (let i = -4; i <= 4; i++) this.box(body, 2.7, 0.95, 0.12, x + s * i * 1.15, 1.75, z + c * i * 1.15, ry);
+    this.box(M.glass, 2.2, 1.0, 0.06, x + s * 5.5, 1.7, z + c * 5.5, ry);
+    this.box(M.black, 2.64, 0.35, 11.04, x, 0.45, z, ry);
+    this.box(M.offwhite, 2.62, 0.08, 11.02, x, 2.7, z, ry);
+    for (const [lx, lz] of [
+      [-1.2, 3.6],
+      [1.2, 3.6],
+      [-1.2, -3.4],
+      [1.2, -3.4],
+    ])
+      this.cyl(M.rubber, 0.5, 0.5, 0.3, x + lx * c + lz * s, 0.5, z - lx * s + lz * c, 12, 0, ry, Math.PI / 2);
+    this.box(M.lampWarm, 0.4, 0.15, 0.05, x + s * 5.52 + c * 0.9, 0.9, z + c * 5.52 - s * 0.9, ry);
+    this.light(x + s * 6.5, 1.0, z + c * 6.5, 0xffd8a0, 6, 8);
   }
 
   lamp(x, z, ry = 0, color = 0xffb35a, flicker = 0, on = true) {

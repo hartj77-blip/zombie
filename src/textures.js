@@ -267,7 +267,6 @@ export const T = {
       }
       blobs(cv, 14, 'rgba(50,45,30,A)', 15, 50, 0.4);
       speckle(cv, 2000, ['rgba(0,0,0,0.15)'], 1, 2);
-      bloodSmears(cv, 2, 0.5);
       return toTex(cv.c);
     }),
 
@@ -456,6 +455,12 @@ export const T = {
       g.strokeRect(8, 8, w - 16, h - 16);
       g.fillStyle = fg;
       g.font = font;
+      // shrink the font until the text fits the sign
+      let size = 72;
+      while (g.measureText(text).width > w - 48 && size > 20) {
+        size -= 4;
+        g.font = font.replace('72px', size + 'px');
+      }
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.shadowColor = fg;
