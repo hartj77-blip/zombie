@@ -1,7 +1,7 @@
 // Game actors: zombies, survivors, thrown projectiles, pickups and destructibles.
 import * as THREE from 'three';
 import { T } from './textures.js';
-import { buildRig, zombieOutfit, survivorOutfit, setRigMat, FLASH_MAT, RED_MAT, charMat, colorMat } from './rig.js';
+import { buildRig, zombieOutfit, survivorOutfit, setRigMat, FLASH_MAT, RED_MAT, charMat, colorMat, collapseBone, addStump } from './rig.js';
 import { rand, randi, pick, chance, clamp, damp, lerp, angleLerp, smooth, easeIn } from './util.js';
 
 const _v = new THREE.Vector3();
@@ -44,28 +44,6 @@ function tagAll(obj, ent, part) {
   });
 }
 
-// Plain structural copy (Object3D.clone() would JSON-copy userData, which holds
-// circular references back to the owning entity).
-export function cloneTree(o) {
-  const c = o.isMesh ? new THREE.Mesh(o.geometry, o.userData.base || o.material) : new THREE.Group();
-  c.position.copy(o.position);
-  c.quaternion.copy(o.quaternion);
-  c.scale.copy(o.scale);
-  c.visible = o.visible;
-  c.castShadow = true;
-  for (const ch of o.children) c.add(cloneTree(ch));
-  return c;
-}
-
-// Copy a (sub)tree into world space so it can fly off as debris.
-function detachCopy(obj) {
-  obj.updateWorldMatrix(true, true);
-  const c = cloneTree(obj);
-  obj.matrixWorld.decompose(c.position, c.quaternion, c.scale);
-  c.visible = true;
-  return c;
-}
-
 // ---------------------------------------------------------------- zombie types
 
 export const ZTYPES = {
@@ -77,7 +55,10 @@ export const ZTYPES = {
   leaper: { hp: 2, speed: [2.4, 2.9], build: 'thin', windup: 0.55, range: 1.5, score: 200, leaps: true, pitch: 1.5 },
 };
 
-const PART_MULT = { head: 3, torso: 1, armL: 0.5, armR: 0.5, legL: 0.5, legR: 0.5 };
+const CHUNK_GEO = new THREE.IcosahedronGeometry(1, 1);
+const PART_MULT = { head: 3, torso: 1, armL: 0.5, armR: 0.5, forearmL: 0.4, forearmR: 0.4, legL: 0.5, legR: 0.5, shinL: 0.4, shinR: 0.4 };
+// damage needed to cut each part off (a pistol round does 1)
+const LIMB_HP = { armL: 1.5, armR: 1.5, forearmL: 1.0, forearmR: 1.0, legL: 2.0, legR: 2.0, shinL: 1.4, shinR: 1.4 };
 
 export class Zombie extends Entity {
   constructor(game, o) {
@@ -102,7 +83,7 @@ export class Zombie extends Entity {
     this.chase = o.chase || null;
     this.fight = o.fight || null;
     this.ambient = !this.fight;
-    this.limbHp = { armL: 1.6, armR: 1.6, legL: 2.2, legR: 2.2 };
+    this.limbHp = { ...LIMB_HP };
     this.severed = {};
     this.crawling = !!D.crawl;
     this.phase = rand(0, 6.28);
@@ -121,11 +102,13 @@ export class Zombie extends Entity {
     this.flashT = 0;
     this.state = 'walk';
     if (this.crawling) {
-      for (const s of ['L', 'R']) {
-        this.rig.legs[s].hip.visible = false;
-        setHittable(this.rig.legs[s].hip, false);
-        this.severed['leg' + s] = true;
-      }
+      // crawlers have already lost their legs (one at the hip, one at the knee)
+      const cut = chance(0.5) ? ['L', 'R'] : ['R', 'L'];
+      collapseBone(this.rig.legs[cut[0]].hip);
+      addStump(this.rig.legs[cut[0]].hip, 0.085);
+      collapseBone(this.rig.legs[cut[1]].knee);
+      addStump(this.rig.legs[cut[1]].knee, 0.055);
+      for (const k of ['leg', 'shin']) for (const sd of ['L', 'R']) this.severed[k + sd] = true;
     }
     const em = o.emerge || 'walk';
     if (em === 'rise') {
@@ -470,28 +453,43 @@ export class Zombie extends Entity {
     }
   }
 
+  // Cut a limb off at the joint above the part that was hit:
+  // forearm -> elbow, upper arm -> shoulder, shin -> knee, thigh -> hip.
   sever(part, dir) {
     const g = this.game;
-    this.severed[part] = true;
     const side = part.slice(-1);
-    const pivot = part.startsWith('arm') ? this.rig.arms[side].shoulder : this.rig.legs[side].hip;
+    const isArm = part.startsWith('arm') || part.startsWith('forearm');
+    const lower = part.startsWith('forearm') || part.startsWith('shin');
+    const upperKey = (isArm ? 'arm' : 'leg') + side;
+    const lowerKey = (isArm ? 'forearm' : 'shin') + side;
+    if (this.severed[upperKey] || (lower && this.severed[lowerKey])) return;
+    const limb = isArm ? this.rig.arms[side] : this.rig.legs[side];
+    const pivot = lower ? (isArm ? limb.elbow : limb.knee) : isArm ? limb.shoulder : limb.hip;
+    let kind;
+    if (lower) kind = isArm ? 'foreArm' : 'shin';
+    else if (this.severed[lowerKey]) kind = isArm ? 'upperArm' : 'thigh';
+    else kind = isArm ? 'arm' : 'leg';
+    this.severed[lower ? lowerKey : upperKey] = true;
+    if (!lower) this.severed[lowerKey] = true;
+
     setRigMat(this.rig, null);
     this.matMode = 0;
-    const copy = detachCopy(pivot);
-    pivot.visible = false;
-    setHittable(pivot, false);
-    g.fx.addDebris(copy, new THREE.Vector3(dir.x * 3 + rand(-1, 1), rand(1.5, 3.5), dir.z * 3 + rand(-1, 1)), new THREE.Vector3(rand(-8, 8), rand(-8, 8), rand(-8, 8)), 5, true, 0.08);
-    pivot.getWorldPosition(_v);
-    g.fx.blood(_v, dir, 18, 3);
-    g.fx.addEmitter({ follow: pivot, kind: 'fountain', rate: 40, life: 1.0 });
+    // the severed piece keeps the limb's current pose as it flies off
+    pivot.updateWorldMatrix(true, false);
+    const piece = this.rig.makeDebris(kind, side);
+    pivot.matrixWorld.decompose(piece.position, piece.quaternion, piece.scale);
+    collapseBone(pivot);
+    const r = (isArm ? (lower ? 0.04 : 0.058) : lower ? 0.056 : 0.088) * this.rig.B.limb;
+    addStump(pivot, r);
+    g.fx.addDebris(piece, new THREE.Vector3(dir.x * 3 + rand(-1, 1), rand(1.5, 3.5), dir.z * 3 + rand(-1, 1)), new THREE.Vector3(rand(-8, 8), rand(-8, 8), rand(-8, 8)), 6, true, 0.06);
+    piece.getWorldPosition(_v);
+    g.fx.blood(_v, dir, 22, 3);
+    g.fx.addEmitter({ follow: pivot, kind: 'fountain', rate: 45, life: 1.2 });
     g.audio.play('sever', { pan: g.panFor(_v) });
-    g.addScore(20, _v, 'LIMB');
-    if (part.startsWith('leg') && !this.crawling) {
+    g.addScore(lower ? 20 : 40, _v, isArm ? 'ARM OFF' : 'LEG OFF');
+    if (!isArm && !this.crawling) {
       // losing a leg drops the zombie to the floor
       this.crawling = true;
-      for (const s of ['L', 'R']) {
-        this.rig.legs[s].hip.visible = s === side ? false : this.rig.legs[s].hip.visible;
-      }
       this.range = 1.35;
       this.stagger(0.8);
     }
@@ -514,46 +512,74 @@ export class Zombie extends Entity {
       this.remove = true;
       return;
     }
-    if (kind === 'head') {
-      const head = this.rig.head;
-      head.getWorldPosition(_v);
-      head.visible = false;
-      g.fx.blood(_v, dir, 40, 4.5, 0.9, 0.11);
-      for (let i = 0; i < 5; i++) {
-        const chunk = new THREE.Mesh(head.geometry, i < 2 ? this.rig.head.userData.base : charMat(T.flesh(), 0.4));
-        chunk.scale.setScalar(rand(0.15, 0.3) * this.scale);
-        chunk.position.copy(_v);
-        g.fx.addDebris(chunk, new THREE.Vector3(dir.x * 3 + rand(-2, 2), rand(2, 5), dir.z * 3 + rand(-2, 2)), new THREE.Vector3(rand(-9, 9), rand(-9, 9), rand(-9, 9)), 4, true, 0.04);
-      }
-      g.fx.addEmitter({ follow: this.rig.neck, kind: 'fountain', rate: 55, life: 1.6 });
-      g.audio.play('headshot', { pan: g.panFor(_v) });
-    } else {
+    if (kind === 'head') this.blowHead(dir);
+    else {
       g.audio.play('hit', { pan: g.panFor(this.root.position) });
       if (Math.random() < 0.5) this.groan(0.8);
     }
   }
 
+  blowHead(dir) {
+    const g = this.game;
+    const r = this.rig;
+    r.headTarget.getWorldPosition(_v);
+    this.headless = true;
+    collapseBone(r.head);
+    const st = addStump(r.head, 0.055);
+    st.rotation.x = Math.PI; // stump faces up out of the neck
+    g.fx.blood(_v, dir, 45, 4.5, 0.9, 0.11);
+    const flesh = charMat(T.flesh(), 0.4);
+    for (let i = 0; i < 7; i++) {
+      const chunk = new THREE.Mesh(CHUNK_GEO, i < 3 ? r.mats.skin : flesh);
+      chunk.scale.set(rand(0.02, 0.045), rand(0.015, 0.035), rand(0.02, 0.04)).multiplyScalar(this.scale);
+      chunk.position.copy(_v);
+      g.fx.addDebris(chunk, new THREE.Vector3(dir.x * 3 + rand(-2, 2), rand(2, 5), dir.z * 3 + rand(-2, 2)), new THREE.Vector3(rand(-9, 9), rand(-9, 9), rand(-9, 9)), 4, true, 0.03);
+    }
+    g.fx.addEmitter({ follow: r.neck, kind: 'fountain', rate: 55, life: 1.6 });
+    g.audio.play('headshot', { pan: g.panFor(_v) });
+  }
+
+  // Blown apart: limbs and head fly off whole, the torso bursts into chunks.
   gib(dir) {
     const g = this.game;
-    this.root.updateWorldMatrix(true, true);
+    const r = this.rig;
+    r.root.updateWorldMatrix(true, true);
     const center = this.root.position.clone().setY(1 * this.scale);
-    for (const m of this.rig.meshes) {
-      if (!m.visible || m.userData.part === undefined) continue;
-      let p = m;
-      let vis = true;
-      while (p) {
-        if (!p.visible) vis = false;
-        p = p.parent;
-      }
-      if (!vis || Math.random() < 0.35) continue;
-      const c = detachCopy(m);
-      const v = c.position.clone().sub(center).normalize().multiplyScalar(rand(2, 6));
+    const fling = (obj) => {
+      const v = obj.position.clone().sub(center).setY(0).normalize().multiplyScalar(rand(2, 5));
       v.x += dir.x * 3;
       v.z += dir.z * 3;
-      v.y = Math.abs(v.y) + rand(1, 4);
-      g.fx.addDebris(c, v, new THREE.Vector3(rand(-12, 12), rand(-12, 12), rand(-12, 12)), rand(3.5, 5), Math.random() < 0.4, 0.06);
+      v.y = rand(2, 5);
+      g.fx.addDebris(obj, v, new THREE.Vector3(rand(-12, 12), rand(-12, 12), rand(-12, 12)), rand(4, 6), true, 0.06);
+    };
+    for (const side of ['L', 'R']) {
+      for (const [isArm, upperKey, lowerKey, top, bottom] of [
+        [true, 'arm' + side, 'forearm' + side, r.arms[side].shoulder, r.arms[side].elbow],
+        [false, 'leg' + side, 'shin' + side, r.legs[side].hip, r.legs[side].knee],
+      ]) {
+        if (this.severed[upperKey]) continue;
+        const kind = this.severed[lowerKey] ? (isArm ? 'upperArm' : 'thigh') : isArm ? 'arm' : 'leg';
+        const piece = r.makeDebris(kind, side);
+        top.matrixWorld.decompose(piece.position, piece.quaternion, piece.scale);
+        fling(piece);
+      }
     }
-    g.fx.blood(center, dir, 70, 6, 1.1, 0.13);
+    if (!this.headless) {
+      const h = r.makeHead();
+      r.headTarget.getWorldPosition(h.position);
+      r.head.getWorldQuaternion(h.quaternion);
+      h.scale.setScalar(this.scale);
+      fling(h);
+    }
+    const flesh = charMat(T.flesh(), 0.35);
+    for (let i = 0; i < 9; i++) {
+      const m = new THREE.Mesh(CHUNK_GEO, i % 3 === 0 ? r.mats.shirt : flesh);
+      m.scale.set(rand(0.04, 0.09), rand(0.03, 0.07), rand(0.04, 0.08)).multiplyScalar(this.scale);
+      m.position.copy(center).add(_v.set(rand(-0.2, 0.2), rand(-0.3, 0.4), rand(-0.2, 0.2)));
+      m.castShadow = true;
+      fling(m);
+    }
+    g.fx.blood(center, dir, 80, 6, 1.1, 0.13);
     g.fx.splat(center.x, center.z, rand(1.5, 2.2));
     g.audio.play('gib', { pan: g.panFor(center) });
     this.root.visible = false;
@@ -765,7 +791,7 @@ export class Zombie extends Entity {
     D(r.torso, 'z', torsoZ);
     D(r.neck, 'x', neckX);
     D(r.neck, 'z', neckZ);
-    D(r.jaw, 'x', jaw);
+    D(r.jaw, 'x', jaw * r.jawScale);
     const sides = ['L', 'R'];
     for (let i = 0; i < 2; i++) {
       const a = r.arms[sides[i]];
