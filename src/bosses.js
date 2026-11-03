@@ -18,7 +18,7 @@ function poseRig(r, P, k, dt) {
   D(r.torso, 'z', P.torsoZ || 0);
   D(r.neck, 'x', P.neckX || 0);
   D(r.neck, 'z', P.neckZ || 0);
-  D(r.jaw, 'x', P.jaw ?? 0.15);
+  D(r.jaw, 'x', (P.jaw ?? 0.15) * r.jawScale);
   ['L', 'R'].forEach((s, i) => {
     D(r.arms[s].shoulder, 'x', P.shX[i]);
     D(r.arms[s].shoulder, 'z', P.shZ ? P.shZ[i] : (i ? 0.15 : -0.15));
@@ -173,9 +173,8 @@ export class Butcher extends Boss {
     r.arms.R.elbow.add(cleaver);
     // pulsing tumour cluster = weak point
     this.weakMat = new THREE.MeshStandardMaterial({ map: T.flesh(), color: 0xff9a60, emissive: 0xff3a0a, emissiveIntensity: 1.5, roughness: 0.3 });
-    const tH = r.B.tl + r.B.tr * 2;
     this.tumor = new THREE.Group();
-    this.tumor.position.set(-0.13, tH * 0.62, r.B.tr * r.B.tsz * 0.9);
+    this.tumor.position.set(-0.12, r.B.tH * 0.62, r.B.chestD * 1.15 + 0.03);
     for (const [x, y, z, s] of [
       [0, 0, 0, 0.13],
       [0.09, 0.07, 0.02, 0.08],
@@ -462,18 +461,17 @@ export class Warden extends Boss {
     }
     // straitjacket straps
     const strap = colorMat(0x3a2a1a, 0.6);
-    const tH = r.B.tl + r.B.tr * 2;
     for (const y of [0.3, 0.55]) {
-      const m = new THREE.Mesh(new THREE.TorusGeometry(r.B.tr * 1.05, 0.015, 6, 20), strap);
+      const m = new THREE.Mesh(new THREE.TorusGeometry(r.B.chestW * 1.02, 0.015, 6, 24), strap);
       m.rotation.x = Math.PI / 2;
-      m.scale.set(r.B.tsx, r.B.tsz * 1.2, 1);
-      m.position.y = tH * y;
+      m.scale.set(1, (r.B.chestD / r.B.chestW) * 1.25, 1);
+      m.position.set(0, r.B.tH * y, 0.012);
       r.torso.add(m);
     }
     // glowing growths on the skull = weak point
     this.weakMat = new THREE.MeshStandardMaterial({ color: 0x80ff60, emissive: 0x40ff20, emissiveIntensity: 1.6, roughness: 0.3 });
     this.growths = new THREE.Group();
-    r.head.add(this.growths);
+    r.headTarget.add(this.growths);
     for (const [x, y, z, s] of [
       [0.05, 0.1, -0.05, 0.06],
       [-0.06, 0.08, -0.07, 0.05],
