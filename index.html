@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>GRAVE SHIFT</title>
+    <meta name="description" content="A browser zombie rail shooter." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="menu">
+    <div id="game">
+      <!-- the WebGL canvas is inserted here -->
+      <canvas id="hud"></canvas>
+
+      <div id="touch-ui">
+        <button id="btn-cover">⛨<span>COVER</span></button>
+        <button id="btn-reload">⟳<span>RELOAD</span></button>
+        <button id="btn-weapon">⇄<span>WEAPON</span></button>
+        <button id="btn-pause">❚❚</button>
+      </div>
+    </div>
+
+    <section id="title" class="screen">
+      <div class="title-inner">
+        <h1 class="logo">GRAVE<br />SHIFT</h1>
+        <p class="tag">ONE NIGHT. ONE GUN. ONE WAY THROUGH.</p>
+        <button id="btn-start" class="big">START GAME</button>
+        <div class="opts">
+          <div class="opt"><label>DIFFICULTY</label><div id="opt-diff" class="seg"></div></div>
+          <div class="opt"><label>GRAPHICS</label><div id="opt-quality" class="seg"></div></div>
+          <div class="opt"><button id="btn-mute" class="small">SOUND: ON</button></div>
+        </div>
+        <div class="controls">
+          <div><b>MOUSE</b> aim</div>
+          <div><b>LEFT CLICK</b> shoot</div>
+          <div><b>RIGHT CLICK / R</b> reload</div>
+          <div><b>HOLD SPACE</b> take cover (auto-reloads, blocks attacks)</div>
+          <div><b>1-4 / WHEEL</b> switch weapon</div>
+          <div><b>ESC</b> pause · <b>M</b> mute</div>
+        </div>
+        <div class="tips">Shoot crates for herbs and weapons · Headshots kill instantly · Shoot thrown objects out of the air · Save the survivors, don't shoot them</div>
+        <div id="hiscore" class="hiscore"></div>
+      </div>
+    </section>
+
+    <section id="card" class="screen">
+      <div class="card-inner">
+        <div id="card-chapter" class="chapter"></div>
+        <div id="card-title" class="card-title"></div>
+        <div id="card-sub" class="card-sub"></div>
+      </div>
+    </section>
+
+    <section id="pause" class="screen dim">
+      <div class="panel">
+        <h2>PAUSED</h2>
+        <button id="btn-resume" class="big">RESUME</button>
+        <button id="btn-quit" class="small">QUIT TO TITLE</button>
+      </div>
+    </section>
+
+    <section id="continue" class="screen dim">
+      <div class="panel center">
+        <h2 class="red">CONTINUE?</h2>
+        <div id="cont-n" class="countdown">9</div>
+        <p class="blink">CLICK TO CONTINUE</p>
+      </div>
+    </section>
+
+    <section id="results" class="screen dim">
+      <div class="panel results">
+        <h2 id="res-title">CLEAR</h2>
+        <div id="res-rows" class="rows"></div>
+        <div class="res-foot">
+          <div>
+            <label>SCORE</label>
+            <div id="res-score" class="score"></div>
+          </div>
+          <div>
+            <label>RANK</label>
+            <div id="res-rank" class="rank"></div>
+          </div>
+        </div>
+        <p class="blink">CLICK TO CONTINUE</p>
+      </div>
+    </section>
+
+    <section id="gameover" class="screen dim">
+      <div class="panel center">
+        <h2 class="red huge">GAME OVER</h2>
+        <label>FINAL SCORE</label>
+        <div id="go-score" class="score"></div>
+        <p class="blink">CLICK TO RETURN TO TITLE</p>
+      </div>
+    </section>
+
+    <section id="victory" class="screen dim">
+      <div class="panel center">
+        <h2 class="huge">DAWN</h2>
+        <p class="story">Subject Zero is dead. The sun rises over Ashgrove. You walk out of the dark, and for the first time in three days, nothing follows you.</p>
+        <label>FINAL SCORE</label>
+        <div id="vic-score" class="score"></div>
+        <label>OVERALL RANK</label>
+        <div id="vic-rank" class="rank"></div>
+        <p id="vic-stats" class="stats"></p>
+        <p class="blink">THANKS FOR PLAYING · CLICK TO RETURN</p>
+      </div>
+    </section>
+
+    <noscript>This game needs JavaScript and WebGL.</noscript>
+    <script src="dist/game.js"></script>
+  </body>
+</html>
