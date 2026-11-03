@@ -86,5 +86,6 @@ npm run build
 | `?god` | Player can't die |
 | `?bot` | Autoplay: the game aims and shoots by itself (used for testing) |
 | `?quality=low` | Force low graphics (no shadows, bloom or MSAA) |
+| `?norender&speed=6` | Skip rendering and run the simulation 6× faster (for automated test runs with `?bot&god`) |
 
 Example: `index.html?stage=2&beat=10&god` jumps to the final boss.

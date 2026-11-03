@@ -23,6 +23,7 @@ export class HUD {
     this.ecgPhase = 0;
     this.card = null;
     this.coverFlash = 0;
+    this.lastCover = false;
     this.time = 0;
     this.dmgFlash = 0;
     this.healFlash = 0;

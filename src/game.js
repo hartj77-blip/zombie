@@ -93,6 +93,8 @@ export class Game {
       beat: P.has('beat') ? parseInt(P.get('beat'), 10) : 0,
       autostart: P.has('autostart') || P.has('bot'),
       dtmax: P.has('dtmax') ? parseFloat(P.get('dtmax')) : 0.05,
+      speed: P.has('speed') ? Math.max(1, parseInt(P.get('speed'), 10)) : 1,
+      norender: P.has('norender'),
     };
     const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
     this.settings = load('graveshift.settings', { difficulty: 'normal', quality: mobile ? 'low' : 'high', muted: false });
@@ -882,7 +884,7 @@ export class Game {
     this.fps = this.fps ? this.fps * 0.95 + (1 / Math.max(0.001, rawDt)) * 0.05 : 60;
     // dynamic resolution: trade sharpness for frame rate on slower GPUs
     this.resT = (this.resT || 0) + rawDt;
-    if (this.resT > 2 && (this.state === 'play' || this.state === 'title')) {
+    if (this.resT > 2 && !this.debug.norender && (this.state === 'play' || this.state === 'title')) {
       this.resT = 0;
       const r = this.resScale || 1;
       if (this.fps < 40 && r > 0.55) {
@@ -894,10 +896,28 @@ export class Game {
       }
     }
     if (dt <= 0) dt = 0.001;
-    this.time += dt;
     this.audio.update();
+    // debug fast-forward: several simulation steps per displayed frame
+    const steps = this.debug.speed;
+    for (let i = 0; i < steps; i++) this.step(dt);
+
+    if (this.debug.norender) {
+      this.scene.updateMatrixWorld();
+      return;
+    }
+    const gu = this.grade.uniforms;
+    gu.uTime.value = this.time;
+    gu.uDamage.value = damp(gu.uDamage.value, this.hud.dmgFlash * 0.8, 10, dt);
+    gu.uCover.value = this.coverAmt;
+    this.composer.render(dt);
+    this.hud.draw(dt);
+  }
+
+  step(dt) {
+    this.time += dt;
     this.timeScale = damp(this.timeScale, 1, 3.5, dt);
     const sdt = dt * this.timeScale;
+    if (this.debug.norender) this.scene.updateMatrixWorld();
 
     switch (this.state) {
       case 'title':
@@ -939,13 +959,6 @@ export class Game {
       this.fx.update(this.state === 'play' ? sdt : dt);
     }
     this.scoreShown = this.scoreShown < this.score ? Math.min(this.score, this.scoreShown + Math.max(10, (this.score - this.scoreShown) * 8 * dt)) : this.score;
-
-    const gu = this.grade.uniforms;
-    gu.uTime.value = this.time;
-    gu.uDamage.value = damp(gu.uDamage.value, this.hud.dmgFlash * 0.8, 10, dt);
-    gu.uCover.value = this.coverAmt;
-    this.composer.render(dt);
-    this.hud.draw(dt);
   }
 
   updatePlay(dt) {
