@@ -161,6 +161,10 @@ export class Arsenal {
       }
       if (!dir) dir = ray.ray.direction.clone();
       const list = ray.intersectObjects(g.hitRoots, true);
+      if (i < 4) {
+        const first = list.find((it) => !(it.object.userData.ent && it.object.userData.ent.dead));
+        g.view.tracer(first ? first.point : ray.ray.at(60, _n));
+      }
       for (const it of list) {
         const ent = it.object.userData.ent;
         if (ent) {

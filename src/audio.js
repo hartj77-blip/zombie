@@ -250,6 +250,11 @@ export class AudioEngine {
         this._tone(t, 0.9, { freq: 70, freqEnd: 22, gain: 1.0, send: 0.2 });
         this._noise(t + 0.1, 0.9, { type: 'bandpass', freq: 400, q: 0.8, gain: 0.5, pan, send: 0.4 });
         break;
+      case 'thunder':
+        this._noise(t, 3.2, { type: 'lowpass', freq: 700, freqEnd: 50, gain: 0.9, send: 0.8, attack: 0.02 });
+        this._noise(t + 0.25, 2.6, { type: 'lowpass', freq: 220, freqEnd: 40, gain: 0.8, send: 0.6, attack: 0.2 });
+        this._tone(t, 1.8, { freq: 48, freqEnd: 24, gain: 0.7, send: 0.3 });
+        break;
       case 'pickup':
         this._tone(t, 0.12, { type: 'square', freq: 880, gain: 0.12, send: 0.2, filter: 'lowpass', ffreq: 3000 });
         this._tone(t + 0.08, 0.25, { type: 'square', freq: 1320, gain: 0.12, send: 0.3, filter: 'lowpass', ffreq: 3000 });

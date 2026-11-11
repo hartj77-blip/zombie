@@ -2,7 +2,7 @@
 
 ### [▶ Play GRAVE SHIFT in your browser](https://hartj77-blip.github.io/zombie/)
 
-[![Zombies, one missing an arm, shambling down a rain-soaked street at night](./docs/screenshot.jpg)](https://hartj77-blip.github.io/zombie/)
+[![First-person view down a rain-soaked street at night, pistol raised, zombies ahead](./docs/screenshot.jpg)](https://hartj77-blip.github.io/zombie/)
 
 A browser zombie **rail shooter** in the spirit of the classic arcade light-gun games: the camera moves you through the level on rails while you aim and shoot with the mouse. It combines three influences:
 

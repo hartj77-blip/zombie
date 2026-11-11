@@ -18,6 +18,8 @@ import { Director } from './director.js';
 import { HUD } from './hud.js';
 import { Input } from './input.js';
 import { STAGES } from './stages.js';
+import { Atmosphere } from './atmosphere.js';
+import { ViewModel } from './viewmodel.js';
 import { rand, clamp, damp, pad, pick } from './util.js';
 
 const DIFFS = {
@@ -33,9 +35,9 @@ const GradeShader = {
     uTime: { value: 0 },
     uDamage: { value: 0 },
     uCover: { value: 0 },
-    uGrain: { value: 0.045 },
-    uSat: { value: 0.82 },
-    uAberr: { value: 0.006 },
+    uGrain: { value: 0.016 },
+    uSat: { value: 0.9 },
+    uAberr: { value: 0.0035 },
     uTint: { value: new THREE.Vector3(1, 1, 1) },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
@@ -57,8 +59,10 @@ const GradeShader = {
       vec3 highTint = vec3(1.1, 1.0, 0.86);
       col *= mix(shadowTint, highTint, smoothstep(0.0, 0.5, l)) * uTint;
       col = mix(col, vec3(l * 1.4, l * 0.2, l * 0.15), uDamage * 0.6);
-      float vig = smoothstep(0.75, 0.12, r2 * (1.0 + uCover * 1.2));
-      col *= mix(0.18, 1.0, vig);
+      // gentle filmic contrast curve, then vignette
+      col = mix(col, col * col * (3.0 - 2.0 * min(col, vec3(1.0))), 0.22);
+      float vig = smoothstep(0.8, 0.1, r2 * (1.0 + uCover * 1.2));
+      col *= mix(0.28, 1.0, vig);
       float n = rnd(vUv * vec2(1733.0, 977.0) + fract(uTime * 7.31)) - 0.5;
       col += n * uGrain * (0.35 + (1.0 - smoothstep(0.0, 0.4, l)) * 0.65);
       col = max(col, 0.0);
@@ -110,6 +114,8 @@ export class Game {
     this.lights = new LightPool(this.scene, 8);
     this.fx = new Effects(this);
     this.arsenal = new Arsenal(this);
+    this.atmo = new Atmosphere(this);
+    this.view = new ViewModel(this);
     this.director = new Director(this);
     this.hud = new HUD(this, document.getElementById('hud'));
     this.input = new Input(this, this.container);
@@ -175,7 +181,7 @@ export class Game {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false }));
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, high ? 1.5 : 1));
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.15;
+    r.toneMappingExposure = 1.3;
     r.shadowMap.enabled = high;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.prepend(r.domElement);
@@ -195,9 +201,13 @@ export class Game {
 
     this.hemi = new THREE.HemisphereLight(0x3a4a6a, 0x16120e, 0.5);
     scene.add(this.hemi);
-    this.moon = new THREE.DirectionalLight(0x8aa0d0, 0.0);
+    this.moon = new THREE.DirectionalLight(0x7f97d0, 0.0);
     this.moon.position.set(-30, 60, 20);
-    scene.add(this.moon);
+    this.moon.shadow.mapSize.set(2048, 2048);
+    Object.assign(this.moon.shadow.camera, { left: -34, right: 34, top: 34, bottom: -34, near: 5, far: 160 });
+    this.moon.shadow.bias = -0.0006;
+    this.moon.shadow.normalBias = 0.06;
+    scene.add(this.moon, this.moon.target);
 
     // the player's flashlight follows the crosshair
     const fl = (this.flashlight = new THREE.SpotLight(0xfff0d8, 22, 45, 0.44, 0.55, 1.5));
@@ -215,7 +225,7 @@ export class Game {
     const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: high ? 4 : 0 });
     this.composer = new EffectComposer(r, rt);
     this.composer.addPass(new RenderPass(scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.55, 0.55, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.8, 0.7, 0.8);
     this.bloom.enabled = high;
     this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);
@@ -419,7 +429,7 @@ export class Game {
     this.stage = st;
     this.theme = st.theme;
     this.scene.fog = new THREE.FogExp2(st.fog, st.fogDensity);
-    this.scene.background = new THREE.Color(st.fog);
+    this.atmo.setup(st);
     this.hemi.color.set(st.hemi[0]);
     this.hemi.groundColor.set(st.hemi[1]);
     this.hemi.intensity = st.hemi[2];
@@ -672,9 +682,7 @@ export class Game {
   onFire(def) {
     this.recoil = Math.min(1, this.recoil + def.kick);
     this.shake(def.kick * 0.25);
-    _v.set(0.35, -0.25, -0.6);
-    this.camera.localToWorld(_v);
-    this.fx.muzzle(_v);
+    this.view.fire(def);
   }
 
   onKill(z, info) {
@@ -862,10 +870,10 @@ export class Game {
     this.viewCos = Math.cos(hf * 0.82);
     this.viewTan = Math.tan(hf * 0.7);
 
-    // flashlight from the right shoulder towards the crosshair
-    _v.set(0.28, -0.22, 0.05);
-    cam.localToWorld(_v);
-    this.flashlight.position.copy(_v);
+    // the flashlight is the weapon light: it shines from under the barrel
+    cam.updateMatrixWorld();
+    this.view.update(dt);
+    this.view.lightWorld(this.flashlight.position);
     _v.set(this.input.aim.x, this.input.aim.y, 0.5).unproject(cam).sub(cam.position).normalize();
     _v.multiplyScalar(14).add(cam.position);
     if (dt === 0.016 && this.flashAim.lengthSq() === 0) this.flashAim.copy(_v);
@@ -967,6 +975,7 @@ export class Game {
     }
 
     if (!this.paused) {
+      this.atmo.update(dt);
       this.lights.update(dt, this.camera.position, this.camFwd);
       this.fx.update(this.state === 'play' ? sdt : dt);
     }

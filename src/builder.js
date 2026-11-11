@@ -1,6 +1,6 @@
 // Level construction helpers: materials, world-UV boxes, batching and props.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { T } from './textures.js';
 import { rand, randi, pick, chance } from './util.js';
 
@@ -39,7 +39,20 @@ export function mats() {
     return std(f.map, 6, { emissive: 0xffffff, emissiveMap: f.emissive, ei: 0.55, bump: 1.5 });
   };
   MATS = {
-    asphalt: std(T.asphalt(), 5, { rough: 0.38, bump: 2.5 }), // rain-slick road
+    asphalt: std(T.wetAsphalt().map, 9, { rough: 1, bump: 2 }), // rain-slick road (see roughnessMap below)
+    walls: [
+      std(T.brick(), 3, { rough: 0.85, bump: 4 }),
+      std(T.brick(), 3, { rough: 0.85, bump: 4, color: 0x8a8f9a }),
+      std(T.plaster(), 3, { bump: 1.5, color: 0xc9b99a }),
+      std(T.brick(), 3.4, { rough: 0.9, bump: 4, color: 0xb08a70 }),
+      std(T.plaster(), 3, { bump: 1.5, color: 0x8c9498 }),
+    ],
+    trim: std(T.sidewalk(), 3, { color: 0x8f8a80, rough: 0.8, bump: 1 }),
+    frame: flat(0x15120f, { rough: 0.6 }),
+    winLit: [glow(0xffb866, 1.5), glow(0xe8c890, 1.2), glow(0x9ab8d8, 1.1), glow(0xff9a4a, 1.0)],
+    awning: [flat(0x6a1a16, { rough: 0.9 }), flat(0x1c3a2a, { rough: 0.9 }), flat(0x1f2c4a, { rough: 0.9 }), flat(0x5a4a1a, { rough: 0.9 })],
+    shopGlass: flat(0x0a1016, { metal: 0.9, rough: 0.04 }),
+    rim: flat(0x8a8f96, { metal: 1, rough: 0.3 }),
     sidewalk: std(T.sidewalk(), 2, { rough: 0.55, bump: 2 }),
     brick: std(T.brick(), 3, { rough: 0.85, bump: 4 }),
     plaster: std(T.plaster(), 3, { bump: 1.5 }),
@@ -87,6 +100,8 @@ export function mats() {
     bloodPool: std(T.bloodDecal(), 1, { transparent: true, depthWrite: false, rough: 0.1 }),
     puddle: std(null, 1, { color: 0x05070a, metal: 0.9, rough: 0.02, transparent: true, opacity: 0.75, depthWrite: false }),
   };
+  MATS.asphalt.roughnessMap = T.wetAsphalt().rough;
+  MATS.asphalt.envMapIntensity = 2.5;
   MATS.bloodPool.polygonOffset = true;
   MATS.bloodPool.polygonOffsetFactor = -2;
   MATS.puddle.polygonOffset = true;
@@ -291,14 +306,107 @@ export class Builder {
     }
   }
 
-  // Simple street building: block with facade texture.
-  building(x0, z0, x1, z1, h, variant = randi(0, 3)) {
+  // Street building with modelled facades: framed windows, sills, string
+  // courses, shopfronts with awnings, a cornice and rooftop clutter.
+  building(x0, z0, x1, z1, h, variant = randi(0, 4)) {
     const M = this.M;
-    const w = Math.abs(x1 - x0);
-    const d = Math.abs(z1 - z0);
-    this.box(M.facade[variant % 4], w, h, d, (x0 + x1) / 2, 0, (z0 + z1) / 2);
-    // roof ledge
-    this.box(M.darkMetal, w + 0.3, 0.3, d + 0.3, (x0 + x1) / 2, h, (z0 + z1) / 2);
+    const xa = Math.min(x0, x1);
+    const xb = Math.max(x0, x1);
+    const za = Math.min(z0, z1);
+    const zb = Math.max(z0, z1);
+    const w = xb - xa;
+    const d = zb - za;
+    const cx = (xa + xb) / 2;
+    const cz = (za + zb) / 2;
+    const wall = M.walls[variant % M.walls.length];
+    this.box(wall, w, h, d, cx, 0, cz);
+    this.box(M.trim, w + 0.5, 0.4, d + 0.5, cx, h - 0.1, cz); // cornice
+    this.box(wall, w + 0.1, 0.7, d + 0.1, cx, h + 0.3, cz); // parapet
+    const faces = [
+      [cx, zb, 0, 1, w],
+      [cx, za, 0, -1, w],
+      [xb, cz, 1, 0, d],
+      [xa, cz, -1, 0, d],
+    ];
+    const G = 3.7; // ground-floor height
+    const F = 3.1; // upper-floor height
+    const floors = Math.max(0, Math.floor((h - G - 0.8) / F));
+    const aw = M.awning[randi(0, M.awning.length - 1)];
+    for (const [fx, fz, nx, nz, L] of faces) {
+      if (L < 3.2) continue;
+      const ry = Math.atan2(nx, nz);
+      const ux = nz;
+      const uz = -nx;
+      // place a box on this face: s along the wall, y up, o outward
+      const put = (mat, bw, bh, bd, sAlong, y, o) => this.box(mat, bw, bh, bd, fx + ux * sAlong + nx * o, y, fz + uz * sAlong + nz * o, ry);
+      const bay = 2.7;
+      const n = Math.max(1, Math.floor((L - 0.8) / bay));
+      const start = -((n - 1) * bay) / 2;
+      put(M.trim, L, 0.55, 0.12, 0, 0, 0.06); // plinth
+      put(M.frame, L, 0.5, 0.1, 0, G - 0.55, 0.05); // fascia above the shopfronts
+      put(M.trim, L, 0.14, 0.16, 0, G, 0.08);
+      for (let f = 1; f <= floors; f++) put(M.trim, L, 0.1, 0.1, 0, G + f * F - 0.05, 0.05);
+      for (let i = 0; i < n; i++) {
+        const sA = start + i * bay;
+        // ground floor: shop window or door
+        if (chance(0.22)) {
+          put(M.frame, 1.3, 2.5, 0.1, sA, 0, 0.03);
+          put(chance(0.5) ? M.wood : M.darkMetal, 1.05, 2.3, 0.06, sA, 0, 0.07);
+          put(M.chrome, 0.05, 0.16, 0.05, sA + 0.38, 1.05, 0.12);
+        } else {
+          put(M.frame, 2.2, 2.25, 0.1, sA, 0.6, 0.03);
+          put(chance(0.12) ? M.winLit[randi(0, 3)] : M.shopGlass, 2.02, 2.07, 0.05, sA, 0.69, 0.07);
+          put(M.frame, 0.05, 2.07, 0.06, sA, 0.69, 0.09);
+          if (chance(0.45)) {
+            put(aw, 2.5, 0.07, 1.1, sA, G - 0.75, 0.55);
+            put(aw, 2.5, 0.28, 0.04, sA, G - 0.98, 1.08);
+          }
+        }
+        // upper floors: framed sash windows
+        for (let f = 0; f < floors; f++) {
+          const y = G + f * F + 0.95;
+          const lit = chance(0.16);
+          put(M.frame, 1.32, 1.82, 0.08, sA, y - 0.06, 0.03);
+          put(lit ? M.winLit[randi(0, 3)] : M.glass, 1.16, 1.66, 0.04, sA, y + 0.02, 0.065);
+          put(M.frame, 1.16, 0.05, 0.05, sA, y + 0.84, 0.08);
+          put(M.frame, 0.045, 1.66, 0.05, sA, y + 0.02, 0.08);
+          put(M.trim, 1.52, 0.09, 0.24, sA, y - 0.15, 0.12); // sill
+          put(M.trim, 1.5, 0.2, 0.14, sA, y + 1.74, 0.07); // lintel
+          if (lit && chance(0.5)) put(M.frame, 0.45, 1.66, 0.03, sA - 0.35, y + 0.02, 0.09); // drawn curtain
+          if (chance(0.07)) put(M.metal, 0.75, 0.42, 0.5, sA, y - 0.5, 0.3); // air conditioner
+        }
+      }
+      // drainpipe
+      this.cyl(M.darkMetal, 0.06, 0.06, h, fx + ux * (L / 2 - 0.35) + nx * 0.1, h / 2, fz + uz * (L / 2 - 0.35) + nz * 0.1, 6);
+    }
+    // rooftop silhouettes
+    if (chance(0.6)) {
+      const tx = cx + rand(-w * 0.25, w * 0.25);
+      const tz = cz + rand(-d * 0.25, d * 0.25);
+      this.cyl(M.wood, 1.1, 1.1, 2.2, tx, h + 3.1, tz, 12);
+      this.cyl(M.darkMetal, 0.2, 1.2, 0.7, tx, h + 4.55, tz, 12);
+      for (const [ox, oz] of [
+        [-0.8, -0.8],
+        [0.8, -0.8],
+        [-0.8, 0.8],
+        [0.8, 0.8],
+      ])
+        this.box(M.darkMetal, 0.1, 1.4, 0.1, tx + ox, h + 0.6, tz + oz);
+    }
+    if (chance(0.7)) this.box(wall, 2.6, 2.2, 3, cx + rand(-w * 0.3, w * 0.3), h + 0.3, cz + rand(-d * 0.3, d * 0.3));
+    if (chance(0.6)) this.cyl(M.darkMetal, 0.03, 0.03, 4, cx + rand(-w * 0.4, w * 0.4), h + 2.6, cz + rand(-d * 0.4, d * 0.4), 4);
+  }
+
+  // Add an arbitrary (possibly non-indexed) geometry to the static batches.
+  geo(g, mat, x, y, z, ry = 0) {
+    if (!g.index) {
+      const idx = [];
+      for (let i = 0; i < g.attributes.position.count; i++) idx.push(i);
+      g.setIndex(idx);
+    }
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    return this._add(g, mat, x, y, z, 0, ry, 0);
   }
 
   sign(text, x, y, z, ry, w = 3, h = 0.75, bg = '#1a1010', fg = '#ffcf6a', lightIt = true) {
@@ -314,62 +422,96 @@ export class Builder {
 
   // ---------------------------------------------------------------- props: street
 
-  car(x, z, ry = 0, color = pick([0x5a1e1e, 0x1e2f4a, 0x3a3a3a, 0x4a4a2a, 0x6a6a6a, 0x26402c]), wrecked = false) {
+  // Car body: an extruded, bevelled side profile with wheel arches.
+  carBody(x, z, ry, paint, opts = {}) {
     const M = this.M;
-    const body = this._colorMat(color);
-    const tilt = wrecked ? rand(-0.08, 0.08) : 0;
-    const sx = Math.sin(ry);
-    const cz = Math.cos(ry);
-    const P = (lx, lz) => [x + lx * cz + lz * sx, z - lx * sx + lz * cz];
-    let [px, pz] = P(0, 0);
-    this.box(body, 1.85, 0.62, 4.3, px, 0.3, pz, ry, 0, tilt);
-    [px, pz] = P(0, -0.2);
-    this.box(body, 1.65, 0.5, 2.1, px, 0.92, pz, ry, 0, tilt);
-    this.box(M.glass, 1.68, 0.4, 2.0, px, 0.96, pz, ry, 0, tilt);
+    const sh = new THREE.Shape();
+    sh.moveTo(-2.14, 0.3);
+    sh.lineTo(-2.2, 0.56);
+    sh.lineTo(-2.12, 0.86);
+    sh.lineTo(-1.5, 0.93);
+    sh.lineTo(-0.98, 1.36);
+    sh.lineTo(0.22, 1.39);
+    sh.lineTo(0.96, 0.96);
+    sh.lineTo(1.92, 0.84);
+    sh.lineTo(2.2, 0.6);
+    sh.lineTo(2.14, 0.3);
+    sh.lineTo(1.76, 0.3);
+    sh.absarc(1.36, 0.32, 0.4, 0, Math.PI, false);
+    sh.lineTo(-0.94, 0.3);
+    sh.absarc(-1.34, 0.32, 0.4, 0, Math.PI, false);
+    sh.closePath();
+    const prism = (shape, width, bevel) => {
+      let g = new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 10 });
+      g.translate(0, 0, -width / 2);
+      g.rotateY(-Math.PI / 2);
+      g = toCreasedNormals(g, 0.7);
+      return g;
+    };
+    this.geo(prism(sh, 1.62, 0.09), paint, x, 0, z, ry);
+    const poly = (pts) => {
+      const p = new THREE.Shape();
+      pts.forEach(([a, b2], i) => (i ? p.lineTo(a, b2) : p.moveTo(a, b2)));
+      p.closePath();
+      return p;
+    };
+    // side glass (wider than the body) and front / rear screens (pushed out along the slants)
+    this.geo(prism(poly([[-1.36, 0.97], [-0.95, 1.31], [0.2, 1.34], [0.82, 0.99]]), 1.83, 0), M.shopGlass, x, 0, z, ry);
+    this.geo(prism(poly([[-1.47, 0.98], [-0.99, 1.375], [0.24, 1.4], [0.98, 0.985]]), 1.5, 0), M.shopGlass, x, 0, z, ry);
+    const c = Math.cos(ry);
+    const s = Math.sin(ry);
+    const P = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
+    // door pillar and door line
+    for (const side of [-1, 1]) {
+      const [px, pz] = P(side * 0.915, -0.32);
+      this.box(paint, 0.02, 0.42, 0.09, px, 0.95, pz, ry);
+    }
     for (const [lx, lz] of [
-      [-0.85, 1.35],
-      [0.85, 1.35],
-      [-0.85, -1.35],
-      [0.85, -1.35],
+      [-0.84, 1.36],
+      [0.84, 1.36],
+      [-0.84, -1.34],
+      [0.84, -1.34],
     ]) {
-      [px, pz] = P(lx, lz);
-      this.cyl(M.rubber, 0.34, 0.34, 0.24, px, 0.34, pz, 10, 0, ry, Math.PI / 2);
+      const [px, pz] = P(lx, lz);
+      this.cyl(M.rubber, 0.35, 0.35, 0.24, px, 0.35, pz, 16, 0, ry, Math.PI / 2);
+      const [rx2, rz2] = P(lx * 1.075, lz);
+      this.cyl(M.rim, 0.21, 0.21, 0.14, rx2, 0.35, rz2, 12, 0, ry, Math.PI / 2);
     }
-    if (!wrecked) {
-      for (const lx of [-0.6, 0.6]) {
-        [px, pz] = P(lx, 2.16);
-        this.box(M.lampWarm, 0.3, 0.12, 0.05, px, 0.6, pz, ry);
-        [px, pz] = P(lx, -2.16);
-        this.box(M.lampRed, 0.3, 0.12, 0.05, px, 0.65, pz, ry);
-      }
+    for (const lx of [-0.62, 0.62]) {
+      let [px, pz] = P(lx, 2.2);
+      this.box(opts.lights ? M.lampWarm : M.offwhite, 0.36, 0.13, 0.06, px, 0.63, pz, ry);
+      [px, pz] = P(lx, -2.2);
+      this.box(opts.lights ? M.lampRed : M.red, 0.34, 0.12, 0.06, px, 0.68, pz, ry);
     }
+    let [px, pz] = P(0, 2.23);
+    this.box(M.frame, 1.0, 0.16, 0.05, px, 0.42, pz, ry); // grille
+    this.box(M.chrome, 1.84, 0.1, 0.06, px, 0.3, pz, ry); // bumpers
+    [px, pz] = P(0, -2.23);
+    this.box(M.chrome, 1.84, 0.1, 0.06, px, 0.3, pz, ry);
+    if (opts.lights) {
+      [px, pz] = P(0, 3.2);
+      this.light(px, 0.7, pz, 0xffe0b0, 9, 9);
+    }
+    return P;
+  }
+
+  car(x, z, ry = 0, color = pick([0x5a1e1e, 0x1e2f4a, 0x3a3a3a, 0x4a4a2a, 0x6a6a6a, 0x26402c]), wrecked = false) {
+    this.carBody(x, z, ry, this._colorMat(wrecked ? new THREE.Color(color).multiplyScalar(0.55).getHex() : color), { lights: !wrecked && chance(0.5) });
   }
 
   policeCar(x, z, ry = 0) {
     const M = this.M;
-    const sx = Math.sin(ry);
-    const cz = Math.cos(ry);
-    const P = (lx, lz) => [x + lx * cz + lz * sx, z - lx * sx + lz * cz];
-    let [px, pz] = P(0, 0);
-    this.box(M.black, 1.85, 0.62, 4.4, px, 0.3, pz, ry);
-    this.box(M.white, 1.87, 0.3, 1.6, px, 0.55, pz, ry);
-    [px, pz] = P(0, -0.2);
-    this.box(M.white, 1.65, 0.5, 2.1, px, 0.92, pz, ry);
-    this.box(M.glass, 1.68, 0.4, 2.0, px, 0.96, pz, ry);
-    this.box(M.lampRed, 0.6, 0.14, 0.3, P(-0.35, -0.2)[0], 1.42, P(-0.35, -0.2)[1], ry);
-    this.box(M.lampBlue, 0.6, 0.14, 0.3, P(0.35, -0.2)[0], 1.42, P(0.35, -0.2)[1], ry);
-    for (const [lx, lz] of [
-      [-0.85, 1.35],
-      [0.85, 1.35],
-      [-0.85, -1.35],
-      [0.85, -1.35],
-    ]) {
-      [px, pz] = P(lx, lz);
-      this.cyl(M.rubber, 0.34, 0.34, 0.24, px, 0.34, pz, 10, 0, ry, Math.PI / 2);
+    const P = this.carBody(x, z, ry, this._colorMat(0x0c0d10), { lights: true });
+    for (const side of [-1, 1]) {
+      const [px, pz] = P(side * 0.905, -0.3);
+      this.box(M.white, 0.03, 0.5, 1.7, px, 0.4, pz, ry); // white door panels
     }
-    [px, pz] = P(0, -0.2);
-    this.light(px - 0.6, 1.7, pz, 0xff2010, 10, 10, { strobe: 0 });
-    this.light(px + 0.6, 1.7, pz, 0x2040ff, 10, 10, { strobe: Math.PI });
+    this.box(M.white, 1.5, 0.03, 1.15, P(0, -0.38)[0], 1.385, P(0, -0.38)[1], ry);
+    this.box(M.lampRed, 0.55, 0.13, 0.26, P(-0.32, -0.3)[0], 1.42, P(-0.32, -0.3)[1], ry);
+    this.box(M.lampBlue, 0.55, 0.13, 0.26, P(0.32, -0.3)[0], 1.42, P(0.32, -0.3)[1], ry);
+    const [px, pz] = P(0, -0.3);
+    this.light(px - 0.6, 1.8, pz, 0xff2010, 12, 11, { strobe: 0 });
+    this.light(px + 0.6, 1.8, pz, 0x2040ff, 12, 11, { strobe: Math.PI });
   }
 
   bus(x, z, ry = 0) {
@@ -609,7 +751,7 @@ export class Builder {
 
   _colorMat(hex) {
     this._cm = this._cm || {};
-    if (!this._cm[hex]) this._cm[hex] = flat(hex, { rough: 0.45, metal: 0.3 });
+    if (!this._cm[hex]) this._cm[hex] = flat(hex, { rough: 0.28, metal: 0.55 });
     return this._cm[hex];
   }
 }
