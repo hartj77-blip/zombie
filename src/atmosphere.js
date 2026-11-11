@@ -111,11 +111,11 @@ export class Atmosphere {
     const k = 1 - g.coverAmt;
     this.halo.material.opacity = 0.055 * k * (this.st && this.st.sky ? 1 : 1.25);
     this.halo.scale.setScalar(6.5);
-    if (Math.random() < dt * 14 * k) {
+    if (Math.random() < dt * 8 * k) {
       const t = rand(0.08, 0.5);
       _v.copy(g.flashlight.position).lerp(fa, t);
       const r = t * 4;
-      g.fx.glow.spawn(_v.x + rand(-r, r), _v.y + rand(-r, r) * 0.6, _v.z + rand(-r, r), rand(-0.05, 0.05), rand(-0.06, 0.02), rand(-0.05, 0.05), { color: this.moteColor, life: rand(1.2, 2.4), size: rand(0.012, 0.022), alpha: 0.5 });
+      g.fx.glow.spawn(_v.x + rand(-r, r), _v.y + rand(-r, r) * 0.6, _v.z + rand(-r, r), rand(-0.05, 0.05), rand(-0.06, 0.02), rand(-0.05, 0.05), { color: this.moteColor, life: rand(1.2, 2.4), size: rand(0.005, 0.01), alpha: 0.28 });
     }
   }
 }

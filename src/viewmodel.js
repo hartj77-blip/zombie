@@ -7,7 +7,7 @@ const steel = new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.85,
 const polymer = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, metalness: 0.1, roughness: 0.7 });
 const chrome = new THREE.MeshStandardMaterial({ color: 0xb4b8be, metalness: 1, roughness: 0.2 });
 const wood = new THREE.MeshStandardMaterial({ color: 0x4a2c16, metalness: 0, roughness: 0.55 });
-const glove = new THREE.MeshStandardMaterial({ color: 0x15120f, metalness: 0, roughness: 0.6 });
+const glove = new THREE.MeshStandardMaterial({ color: 0x2a2018, metalness: 0, roughness: 0.6 });
 const sleeve = new THREE.MeshStandardMaterial({ color: 0x1a2030, metalness: 0, roughness: 0.9 });
 const lens = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff0d0).multiplyScalar(2.5) });
 const brass = new THREE.MeshStandardMaterial({ color: 0xc9a040, metalness: 1, roughness: 0.3 });
@@ -29,7 +29,7 @@ const C = (m, r, len, x, y, z, seg = 12) => {
 // Every model points down -Z with the grip at the origin.
 function hand(g) {
   const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), glove);
-  palm.scale.set(0.034, 0.05, 0.045);
+  palm.scale.set(0.026, 0.044, 0.036);
   palm.position.set(0, -0.062, 0.022);
   g.add(palm);
   for (let i = 0; i < 4; i++) {
