@@ -172,15 +172,139 @@ function cached(key, fn) {
 // ---------------------------------------------------------------- environment
 
 export const T = {
-  asphalt: () =>
-    cached('asphalt', () => {
+  // Rain-slick road: colour map plus a roughness map with mirror-like puddles.
+  asphalt: () => T.wetAsphalt().map,
+  wetAsphalt: () =>
+    cached('wetAsphalt', () => {
       const cv = mk(256);
-      cv.g.fillStyle = '#262628';
+      const ro = mk(256);
+      cv.g.fillStyle = '#242426';
       cv.g.fillRect(0, 0, 256, 256);
-      speckle(cv, 5000, ['#1c1c1e', '#303033', '#38383a', '#222'], 1, 2);
-      blobs(cv, 8, 'rgba(0,0,0,A)', 10, 40, 0.35);
-      cracks(cv, 6, 'rgba(10,10,10,0.8)', 60);
-      return toTex(cv.c);
+      speckle(cv, 7000, ['#1a1a1c', '#2e2e31', '#39393b', '#202022', '#444446'], 1, 2);
+      blobs(cv, 8, 'rgba(0,0,0,A)', 10, 40, 0.3);
+      // patched repairs and tyre-worn lanes
+      cv.g.fillStyle = 'rgba(10,10,12,0.35)';
+      cv.g.fillRect(40, 0, 26, 256);
+      cv.g.fillRect(170, 0, 26, 256);
+      cv.g.fillStyle = 'rgba(60,60,64,0.25)';
+      cv.g.fillRect(90, 60, 50, 34);
+      cracks(cv, 9, 'rgba(8,8,8,0.85)', 70);
+      // roughness: green channel. damp everywhere, standing water in the dips
+      ro.g.fillStyle = 'rgb(0,118,0)';
+      ro.g.fillRect(0, 0, 256, 256);
+      speckle(ro, 3000, ['rgb(0,150,0)', 'rgb(0,95,0)'], 1, 3);
+      for (let i = 0; i < 9; i++) {
+        const x = rand(0, 256);
+        const y = rand(0, 256);
+        const r = rand(14, 38);
+        const sx = rand(0.6, 1.6);
+        for (const [c2, col, a] of [
+          [ro, '0,10,0', 1],
+          [cv, '4,5,8', 0.55],
+        ]) {
+          wrap(c2, x, y, r * 2, (px, py) => {
+            c2.g.save();
+            c2.g.translate(px, py);
+            c2.g.scale(sx, 1);
+            const grd = c2.g.createRadialGradient(0, 0, r * 0.45, 0, 0, r);
+            grd.addColorStop(0, `rgba(${col},${a})`);
+            grd.addColorStop(1, `rgba(${col},0)`);
+            c2.g.fillStyle = grd;
+            c2.g.fillRect(-r, -r, r * 2, r * 2);
+            c2.g.restore();
+          });
+        }
+      }
+      return { map: toTex(cv.c), rough: toTex(ro.c, { color: false }) };
+    }),
+
+  // Night sky: cloud bank lit by the moon and the glow of the town.
+  sky: () =>
+    cached('sky', () => {
+      const cv = mk(1024, 512, 1);
+      const g = cv.g;
+      const grd = g.createLinearGradient(0, 0, 0, 512);
+      grd.addColorStop(0, '#02030a');
+      grd.addColorStop(0.3, '#070b18');
+      grd.addColorStop(0.47, '#141a2c');
+      grd.addColorStop(0.5, '#1c2030');
+      grd.addColorStop(1, '#0a0e16');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 1024, 512);
+      g.fillStyle = '#cfd6e6';
+      for (let i = 0; i < 260; i++) {
+        g.globalAlpha = rand(0.2, 0.9);
+        g.fillRect(rand(0, 1024), rand(0, 220), rand(0.6, 1.6), rand(0.6, 1.6));
+      }
+      g.globalAlpha = 1;
+      // moon and halo
+      const mx = 640;
+      const my = 150;
+      let h = g.createRadialGradient(mx, my, 0, mx, my, 150);
+      h.addColorStop(0, 'rgba(190,205,235,0.55)');
+      h.addColorStop(0.2, 'rgba(120,140,190,0.22)');
+      h.addColorStop(1, 'rgba(60,80,130,0)');
+      g.fillStyle = h;
+      g.fillRect(mx - 150, my - 150, 300, 300);
+      g.fillStyle = '#e8e6da';
+      g.beginPath();
+      g.arc(mx, my, 17, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = 'rgba(150,150,140,0.45)';
+      for (let i = 0; i < 7; i++) {
+        g.beginPath();
+        g.arc(mx + rand(-10, 10), my + rand(-10, 10), rand(1.5, 4.5), 0, Math.PI * 2);
+        g.fill();
+      }
+      // cloud layers (wrapped horizontally)
+      for (let i = 0; i < 150; i++) {
+        const x = rand(0, 1024);
+        const y = rand(30, 270);
+        const r = rand(30, 110);
+        const near = Math.max(0, 1 - Math.hypot(x - mx, y - my) / 320);
+        const c = Math.round(18 + near * 95);
+        const a = rand(0.08, 0.3);
+        for (const ox of [-1024, 0, 1024]) {
+          g.save();
+          g.translate(x + ox, y);
+          g.scale(2.4, 0.55);
+          h = g.createRadialGradient(0, 0, 0, 0, 0, r);
+          h.addColorStop(0, `rgba(${c},${c + 6},${c + 20},${a})`);
+          h.addColorStop(1, `rgba(${c},${c + 6},${c + 20},0)`);
+          g.fillStyle = h;
+          g.fillRect(-r, -r, r * 2, r * 2);
+          g.restore();
+        }
+      }
+      return toTex(cv.c, { repeat: false });
+    }),
+
+  // Star-shaped muzzle flash.
+  muzzle: () =>
+    cached('muzzle', () => {
+      const cv = mk(128, 128, 1);
+      const g = cv.g;
+      g.translate(64, 64);
+      const core = g.createRadialGradient(0, 0, 0, 0, 0, 40);
+      core.addColorStop(0, 'rgba(255,255,240,1)');
+      core.addColorStop(0.3, 'rgba(255,210,120,0.8)');
+      core.addColorStop(1, 'rgba(255,120,20,0)');
+      g.fillStyle = core;
+      g.fillRect(-64, -64, 128, 128);
+      for (let i = 0; i < 7; i++) {
+        g.rotate((Math.PI * 2) / 7 + rand(-0.2, 0.2));
+        const len = rand(34, 62);
+        const sp = g.createLinearGradient(0, 0, len, 0);
+        sp.addColorStop(0, 'rgba(255,240,200,0.95)');
+        sp.addColorStop(1, 'rgba(255,140,30,0)');
+        g.fillStyle = sp;
+        g.beginPath();
+        g.moveTo(0, -7);
+        g.lineTo(len, 0);
+        g.lineTo(0, 7);
+        g.fill();
+      }
+      return toTex(cv.c, { repeat: false });
     }),
 
   sidewalk: () =>
