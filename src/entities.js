@@ -434,6 +434,8 @@ export class Zombie extends Entity {
       }
       g.fx.blood(h.point, dir, h.part === 'head' ? 10 : 6, 2.5);
     }
+    // spatter on the ground behind the zombie
+    if (Math.random() < 0.6) g.fx.splat(this.root.position.x + dir.x * rand(0.4, 1.6) + rand(-0.4, 0.4), this.root.position.z + dir.z * rand(0.4, 1.6) + rand(-0.4, 0.4), rand(0.35, 0.9));
     this.hp -= total;
     this.flashT = 0.06;
     this.flinch = Math.min(1, this.flinch + 0.6);

@@ -21,14 +21,36 @@ function room(b, o) {
   if (!o.skip?.includes('zMax')) b.wall(w, xa, zb, xb, zb, h, 0.25, conv(d.zMax, xa));
   if (!o.skip?.includes('xMin')) b.wall(w, xa, za, xa, zb, h, 0.25, conv(d.xMin, za));
   if (!o.skip?.includes('xMax')) b.wall(w, xb, za, xb, zb, h, 0.25, conv(d.xMax, za));
+  // trim: baseboards, a ceiling cove, optional handrails and door frames
+  const M = b.M;
+  const sides = [
+    ['zMin', xa, za, xb, za, xa],
+    ['zMax', xa, zb, xb, zb, xa],
+    ['xMin', xa, za, xa, zb, za],
+    ['xMax', xb, za, xb, zb, za],
+  ];
+  for (const [key, ax, az, bx, bz, start] of sides) {
+    if (o.skip?.includes(key)) continue;
+    const doors = conv(d[key], start);
+    const base = o.base ?? M.frame;
+    b.wall(base, ax, az, bx, bz, 0.13, 0.33, doors);
+    b.wall(o.cove ?? M.trim, ax, az, bx, bz, 0.09, 0.35, [], h - 0.09);
+    if (o.rail) b.wall(M.chrome, ax, az, bx, bz, 0.05, 0.39, doors, 0.92);
+    if (o.band) b.wall(o.band, ax, az, bx, bz, 0.22, 0.29, doors, 1.15);
+    const horiz = key[0] === 'z';
+    for (const q of d[key] || []) {
+      const dw = q.w ?? 1.4;
+      const dh = q.h ?? 2.4;
+      for (const sgn of [-1, 1]) {
+        const c = q.c + sgn * (dw / 2 + 0.04);
+        b.box(base, horiz ? 0.1 : 0.37, dh + 0.1, horiz ? 0.37 : 0.1, horiz ? c : ax, 0, horiz ? az : c);
+      }
+      b.box(base, horiz ? dw + 0.18 : 0.37, 0.1, horiz ? 0.37 : dw + 0.18, horiz ? q.c : ax, dh, horiz ? az : q.c);
+    }
+  }
 }
 
-function moonAndSky(b) {
-  const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.moon(), fog: false, depthWrite: false, color: 0xd8d0c0 }));
-  moon.position.set(60, 70, -170);
-  moon.scale.setScalar(26);
-  b.root.add(moon);
-}
+function moonAndSky() {} // the sky dome lives in atmosphere.js
 
 // =====================================================================
 // CHAPTER 1 - the town at night
@@ -41,9 +63,12 @@ const stage1 = {
   fog: 0x0a0e16,
   fogDensity: 0.034,
   hemi: [0x5a6a90, 0x1a140e, 0.42],
-  moon: 0.35,
-  env: 0.35,
+  moon: 0.85,
+  env: 0.4,
   rain: true,
+  sky: true,
+  lightning: true,
+  mist: 0.055,
   tint: [1.0, 1.0, 1.04],
   start: [0, E, 4],
   lookStart: [0, 1.4, -20],
@@ -96,11 +121,11 @@ const stage1 = {
     b.box(M.darkMetal, 0.08, 3.4, 0.08, 7.82, 0.2, -25);
 
     // signs
-    b.sign('DINER', -8.85, 3.6, -9, Math.PI / 2, 3.2, 0.9, '#2a0808', '#ff5a4a');
-    b.sign('PHARMACY', 8.85, 3.6, -35, -Math.PI / 2, 4, 0.9, '#04140a', '#5aff8a');
-    b.sign('ROXY BAR', -8.85, 4.2, -66, Math.PI / 2, 3.6, 0.9, '#140418', '#ff5ad8');
-    b.sign('HOTEL', 8.85, 6.5, -70, -Math.PI / 2, 3, 0.8, '#101010', '#ffd27a');
-    b.sign('MILLER & SONS  BUTCHER', 73.85, 4.4, -90, -Math.PI / 2, 7, 1.2, '#1a0606', '#ff8a3a');
+    b.sign('DINER', -8.68, 3.9, -9, Math.PI / 2, 3.2, 0.9, '#2a0808', '#ff5a4a');
+    b.sign('PHARMACY', 8.68, 3.9, -35, -Math.PI / 2, 4, 0.9, '#04140a', '#5aff8a');
+    b.sign('ROXY BAR', -8.68, 3.9, -66, Math.PI / 2, 3.6, 0.9, '#140418', '#ff5ad8');
+    b.sign('HOTEL', 8.68, 6.9, -70, -Math.PI / 2, 3, 0.8, '#101010', '#ffd27a');
+    b.sign('MILLER & SONS  BUTCHER', 73.68, 4.4, -90, -Math.PI / 2, 7, 1.2, '#1a0606', '#ff8a3a');
     // butcher shop doorway (dark)
     b.box(M.black, 0.1, 2.8, 2.4, 73.9, 0, -90);
     b.light(70, 2.5, -90, 0xff6a2a, 10, 10, { flicker: 0.4 });
@@ -310,6 +335,8 @@ const stage2 = {
   theme: 'hospital',
   fog: 0x0b100e,
   fogDensity: 0.045,
+  mist: 0.03,
+  mistColor: 0x9ab0a4,
   hemi: [0x6a7a70, 0x1a1a16, 0.32],
   env: 0.3,
   tint: [0.96, 1.04, 0.98],
@@ -353,6 +380,7 @@ const stage2 = {
       wall: M.hospWall,
       floor: M.hospFloor,
       ceil: M.ceiling,
+      rail: true,
       skip: ['zMin', 'zMax'],
       doors: { xMin: doors1L.map((c) => ({ c, w: 1.3 })), xMax: doors1R.map((c) => ({ c, w: 1.3 })) },
     });
@@ -397,7 +425,7 @@ const stage2 = {
       b.bloodPool(x, z, rand(1, 1.8));
 
     // corridor 2 to the atrium
-    room(b, { x: [8, 30], z: [-78, -74], h: 3.0, wall: M.hospWall, floor: M.hospFloor, ceil: M.ceiling, skip: ['xMin', 'xMax'] });
+    room(b, { x: [8, 30], z: [-78, -74], h: 3.0, rail: true, wall: M.hospWall, floor: M.hospFloor, ceil: M.ceiling, skip: ['xMin', 'xMax'] });
     for (let x = 11; x < 30; x += 5) b.ceilingLight(x, -76, 2.98, chance(0.8), chance(0.5) ? 0.8 : 0, Math.PI / 2);
     b.gurney(22, -74.6, Math.PI / 2 + 0.1);
 
@@ -526,6 +554,8 @@ const stage3 = {
   theme: 'lab',
   fog: 0x080a0e,
   fogDensity: 0.04,
+  mist: 0.045,
+  mistColor: 0x8a9ab0,
   hemi: [0x50607a, 0x100c0c, 0.3],
   env: 0.45,
   tint: [0.98, 1.0, 1.06],
@@ -537,10 +567,10 @@ const stage3 = {
     const M = b.M;
     g.tanks = [];
     // elevator landing + corridor A
-    room(b, { x: [-3, 3], z: [-6, 4], h: 3.5, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, doors: { zMin: [{ c: 0, w: 4.4, h: 3.2 }] } });
+    room(b, { x: [-3, 3], z: [-6, 4], h: 3.5, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, doors: { zMin: [{ c: 0, w: 4.4, h: 3.2 }] } });
     b.box(M.darkMetal, 5, 3.2, 0.2, 0, 0, 3.7);
     for (let x = -2.2; x <= 2.2; x += 0.4) b.box(M.chrome, 0.04, 3.2, 0.04, x, 0, 3.4);
-    room(b, { x: [-2.2, 2.2], z: [-38, -6], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, skip: ['zMin', 'zMax'] });
+    room(b, { x: [-2.2, 2.2], z: [-38, -6], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, skip: ['zMin', 'zMax'] });
     b.box(M.hazard, 0.35, 0.012, 32, -1.95, 0, -22);
     b.box(M.hazard, 0.35, 0.012, 32, 1.95, 0, -22);
     b.pipe(-1.6, 2.85, -6, -1.6, 2.85, -38, 0.12);
@@ -551,7 +581,7 @@ const stage3 = {
     b.sign('SUBLEVEL 4  ·  BIOHAZARD', 0, 2.6, -5.85, Math.PI, 3.6, 0.5, '#1a1400', '#ffd23a', false);
 
     // specimen hall
-    room(b, { x: [-11, 11], z: [-72, -38], h: 6, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, doors: { zMax: [{ c: 0, w: 4.4, h: 3.2 }], zMin: [{ c: 0, w: 4, h: 3.2 }] } });
+    room(b, { x: [-11, 11], z: [-72, -38], h: 6, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, doors: { zMax: [{ c: 0, w: 4.4, h: 3.2 }], zMin: [{ c: 0, w: 4, h: 3.2 }] } });
     const burstAt = [
       [-6.5, -44],
       [6.5, -50],
@@ -581,17 +611,17 @@ const stage3 = {
     b.box(M.hazard, 4.4, 0.012, 0.4, 0, 0, -38.3);
 
     // corridor B
-    room(b, { x: [-2, 2], z: [-84, -72], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, skip: ['zMax'], doors: { xMin: [{ c: -82, w: 3.6, h: 3 }] } });
+    room(b, { x: [-2, 2], z: [-84, -72], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, skip: ['zMax'], doors: { xMin: [{ c: -82, w: 3.6, h: 3 }] } });
     b.alarm(1.85, 2.6, -77);
     b.ceilingLight(0, -78, 3.18, true, 0.8);
     // corridor C
-    room(b, { x: [-34, -2], z: [-84, -80], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, skip: ['xMin', 'xMax'] });
+    room(b, { x: [-34, -2], z: [-84, -80], h: 3.2, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, skip: ['xMin', 'xMax'] });
     for (const x of [-8, -16, -24]) b.alarm(x, 2.6, -80.15);
     for (const x of [-12, -20, -28]) b.ceilingLight(x, -82, 3.18, chance(0.7), 0.7, Math.PI / 2);
     b.pipe(-2, 2.85, -83.5, -34, 2.85, -83.5, 0.12);
 
     // containment chamber + pit
-    room(b, { x: [-64, -34], z: [-98, -66], h: 12, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, doors: { xMax: [{ c: -82, w: 4, h: 3.2 }] } });
+    room(b, { x: [-64, -34], z: [-98, -66], h: 12, wall: M.labWall, floor: M.plate, ceil: M.darkMetal, base: M.darkMetal, cove: M.darkMetal, doors: { xMax: [{ c: -82, w: 4, h: 3.2 }] } });
     b.cyl(M.black, 5.5, 5.5, 0.05, -48, 0.01, -82, 32);
     b.cyl(M.hazard, 6.2, 6.2, 0.2, -48, -0.02, -82, 32);
     b.cyl(M.black, 5.5, 5.5, 0.4, -48, 0.06, -82, 32);

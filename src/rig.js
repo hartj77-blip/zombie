@@ -553,7 +553,7 @@ export function colorMat(hex, rough = 0.6, metal = 0, emissive = 0x000000, ei = 
 }
 const eyeMat = (hex) => {
   const key = 'eye' + hex;
-  if (!matCache.has(key)) matCache.set(key, new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(3) }));
+  if (!matCache.has(key)) matCache.set(key, new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(1.7) }));
   return matCache.get(key);
 };
 
