@@ -96,3 +96,7 @@ npm run build
 | `?norender&speed=6` | Skip rendering and run the simulation 6× faster (for automated test runs with `?bot&god`) |
 
 Example: `index.html?stage=2&beat=10&god` jumps to the final boss.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
