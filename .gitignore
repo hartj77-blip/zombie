@@ -1,2 +1,8 @@
 node_modules/
 .DS_Store
+
+# OS and editor files
+Thumbs.db
+.vscode/
+.idea/
+*.swp
